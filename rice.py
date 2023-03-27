@@ -76,7 +76,8 @@ class Rice:
 
         # Constants
         params, num_regions = set_rice_params(
-            os.path.join(_PUBLIC_REPO_DIR, "region_yamls"),
+            #os.path.join(_PUBLIC_REPO_DIR, "region_yamls"),
+            os.path.join(_PUBLIC_REPO_DIR, "fewer_region_yamls"),
         )
         # TODO : add to yaml
         self.balance_interest_rate = 0.1

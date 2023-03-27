@@ -82,7 +82,7 @@ class TorchLinear(TorchModelV2, nn.Module):
             output_dim = act_space.n
             self.output_dims += [output_dim]
             policy_heads[idx] = nn.Linear(fc_dims[-1], output_dim)
-        self.policy_head = nn.ModuleList(policy_heads)
+        self.policy_head = nn.ModuleList(policy_heads)action_mask
 
         # value-function network head
         self.vf_head = nn.Linear(fc_dims[-1], 1)

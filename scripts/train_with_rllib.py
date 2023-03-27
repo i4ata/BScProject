@@ -17,17 +17,76 @@ import subprocess
 import sys
 import time
 
+import importlib.util as iu
+
 import numpy as np
 import yaml
-from run_unittests import import_class_from_path
-from desired_outputs import desired_outputs
-from fixed_paths import PUBLIC_REPO_DIR
+#from run_unittests import import_class_from_path
+#from desired_outputs import desired_outputs
+#from fixed_paths import PUBLIC_REPO_DIR
+
+# ME:
+def import_class_from_path(class_name=None, path=None):
+    """
+    Helper function to import class from a path.
+    """
+    assert class_name is not None
+    assert path is not None
+    spec = iu.spec_from_file_location(class_name, path)
+    module_from_spec = iu.module_from_spec(spec)
+    spec.loader.exec_module(module_from_spec)
+    return getattr(module_from_spec, class_name)
+
+desired_outputs = [
+    "global_temperature",
+    "global_carbon_mass",
+    "capital_all_regions",
+    "labor_all_regions",
+    "production_factor_all_regions",
+    "intensity_all_regions",
+    "global_exogenous_emissions",
+    "global_land_emissions",
+    "timestep",
+    "activity_timestep",
+    "capital_depreciation_all_regions",
+    "savings_all_regions",
+    "mitigation_rate_all_regions",
+    "max_export_limit_all_regions",
+    "mitigation_cost_all_regions",
+    "damages_all_regions",
+    "abatement_cost_all_regions",
+    "utility_all_regions",
+    "social_welfare_all_regions",
+    "reward_all_regions",
+    "consumption_all_regions",
+    "current_balance_all_regions",
+    "gross_output_all_regions",
+    "investment_all_regions",
+    "production_all_regions",
+    "tariffs",
+    "future_tariffs",
+    "scaled_imports",
+    "desired_imports",
+    "tariffed_imports",
+    "stage",
+    "minimum_mitigation_rate_all_regions",
+    "promised_mitigation_rate",
+    "requested_mitigation_rate",
+    "proposal_decisions",
+]
+
+import os, sys
+from pathlib import Path
+_path = Path(os.path.abspath(__file__))
+PUBLIC_REPO_DIR = str(_path.parent.parent.absolute())
+sys.path.append(os.path.join(PUBLIC_REPO_DIR, "scripts"))
+#print("fixed_paths: Using PUBLIC_REPO_DIR = {}".format(PUBLIC_REPO_DIR))
+# UNTIL HERE
 
 sys.path.append(PUBLIC_REPO_DIR)
 
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
 logging.getLogger().setLevel(logging.DEBUG)
-
 
 def perform_other_imports():
     """
