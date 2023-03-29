@@ -121,6 +121,11 @@ class Rice:
 
         # Defining observation and action spaces
         self.observation_space = None  # This will be set via the env_wrapper (in utils)
+        #
+        self.global_features, self.public_features, self.private_features, self.bilateral_features = self.init_features()
+        #
+
+
 
         # Notation nvec: vector of counts of each categorical variable
         # Each region sets mitigation and savings rates
@@ -343,46 +348,7 @@ class Rice:
 
         return self.generate_observation()
 
-    def step(self, actions=None):
-        """
-        The environment step function.
-        If negotiation is enabled, it also comprises
-        the proposal and evaluation steps.
-        """
-        # Increment timestep
-        self.timestep += 1
-
-        # Carry over the previous global states to the current timestep
-        for key in self.global_state:
-            if key != "reward_all_regions":
-                self.global_state[key]["value"][self.timestep] = self.global_state[key][
-                    "value"
-                ][self.timestep - 1].copy()
-
-        self.set_global_state(
-            "timestep", self.timestep, self.timestep, dtype=self.int_dtype
-        )
-        if self.negotiation_on:
-            # Note: The '+1` below is for the climate_and_economy_simulation_step
-            self.stage = self.timestep % (self.num_negotiation_stages + 1)
-            self.set_global_state(
-                "stage", self.stage, self.timestep, dtype=self.int_dtype
-            )
-            if self.stage == 1:
-                return self.proposal_step(actions)
-
-            if self.stage == 2:
-                return self.evaluation_step(actions)
-
-        return self.climate_and_economy_simulation_step(actions)
-
-    def generate_observation(self):
-        """
-        Generate observations for each agent by concatenating global, public
-        and private features.
-        The observations are returned as a dictionary keyed by region index.
-        Each dictionary contains the features as well as the action mask.
-        """
+    def init_features(self):
         # Observation array features
 
         # Global features that are observable by all regions
@@ -440,9 +406,51 @@ class Rice:
                 "requested_mitigation_rate",
                 "proposal_decisions",
             ]
+        return global_features, public_features, private_features, bilateral_features
+
+    def step(self, actions=None):
+        """
+        The environment step function.
+        If negotiation is enabled, it also comprises
+        the proposal and evaluation steps.
+        """
+        # Increment timestep
+        self.timestep += 1
+
+        # Carry over the previous global states to the current timestep
+        for key in self.global_state:
+            if key != "reward_all_regions":
+                self.global_state[key]["value"][self.timestep] = self.global_state[key][
+                    "value"
+                ][self.timestep - 1].copy()
+
+        self.set_global_state(
+            "timestep", self.timestep, self.timestep, dtype=self.int_dtype
+        )
+        if self.negotiation_on:
+            # Note: The '+1` below is for the climate_and_economy_simulation_step
+            self.stage = 0#self.timestep % (self.num_negotiation_stages + 1)
+            self.set_global_state(
+                "stage", self.stage, self.timestep, dtype=self.int_dtype
+            )
+            if self.stage == 1:
+                return self.proposal_step(actions)
+
+            if self.stage == 2:
+                return self.evaluation_step(actions)
+
+        return self.climate_and_economy_simulation_step(actions)
+
+    def generate_observation(self):
+        """
+        Generate observations for each agent by concatenating global, public
+        and private features.
+        The observations are returned as a dictionary keyed by region index.
+        Each dictionary contains the features as well as the action mask.
+        """
 
         shared_features = np.array([])
-        for feature in global_features + public_features:
+        for feature in self.global_features + self.public_features:
             shared_features = np.append(
                 shared_features,
                 self.flatten_array(
@@ -450,7 +458,6 @@ class Rice:
                     / self.global_state[feature]["norm"]
                 ),
             )
-
         # Form the feature dictionary, keyed by region_id.
         features_dict = {}
         for region_id in range(self.num_regions):
@@ -460,7 +467,7 @@ class Rice:
 
             all_features = np.append(region_indicator, shared_features)
 
-            for feature in private_features:
+            for feature in self.private_features:
                 assert self.global_state[feature]["value"].shape[1] == self.num_regions
                 all_features = np.append(
                     all_features,
@@ -470,7 +477,7 @@ class Rice:
                     ),
                 )
 
-            for feature in bilateral_features:
+            for feature in self.bilateral_features:
                 assert self.global_state[feature]["value"].shape[1] == self.num_regions
                 assert self.global_state[feature]["value"].shape[2] == self.num_regions
                 all_features = np.append(
