@@ -23,7 +23,6 @@ class Agent:
             observation : Dict):
         
         probs = self.nets[stage](observation)
-
         actions, log_probs = zip(*[self.get_action_and_log_prob(space) for space in probs])
         log_probs = torch.cat([log_prob.unsqueeze(0) for log_prob in log_probs]) 
         return actions, log_probs

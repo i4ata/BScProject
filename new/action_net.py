@@ -53,19 +53,22 @@ class ActionNet(nn.Module):
         return int(obs_size)
 
     def get_flattened_obs(self, obs : Dict) -> torch.Tensor:
-        """Get the flattened observation (ignore the action masks). 
-        TODO: Look up how we can pass batches of observations"""
+        """Get the flattened observation (ignore the action masks). """
         flattened_obs_dict = {}
         for key in sorted(self.observation_space):
+            assert key in obs
             if key == _ACTION_MASK:
                 self.action_mask = self.reshape_and_flatten_obs(obs[key])
             else:
                 flattened_obs_dict[key] = self.reshape_and_flatten_obs(obs[key])
         
         #flattened_obs = torch.cat(list(flattened_obs_dict.values()), dim=-1) # this line is used when the observation is batchified
+        #return torch.cat(list(flattened_obs_dict.values()), dim=-1)
         return torch.FloatTensor(list(flattened_obs_dict.values()))
 
     def reshape_and_flatten_obs(self, obs : torch.Tensor) -> torch.Tensor:
         """Flatten observation."""
+        #print(type(obs))
+        #assert len(obs.shape) >= 2
         batch_dim = obs.shape[0]
         return obs.reshape(batch_dim, -1)
