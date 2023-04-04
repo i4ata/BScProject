@@ -64,6 +64,7 @@ class Rice:
         self,
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
         negotiation_on=False,  # If True then negotiation is on, else off
+        region_yamls_filename = 'region_yamls'
     ):
         """TODO : init docstring"""
         assert (
@@ -77,7 +78,7 @@ class Rice:
         # Constants
         params, num_regions = set_rice_params(
             #os.path.join(_PUBLIC_REPO_DIR, "region_yamls"),
-            os.path.join(_PUBLIC_REPO_DIR, "fewer_region_yamls"),
+            os.path.join(_PUBLIC_REPO_DIR, region_yamls_filename),
         )
         # TODO : add to yaml
         self.balance_interest_rate = 0.1
@@ -429,7 +430,7 @@ class Rice:
         )
         if self.negotiation_on:
             # Note: The '+1` below is for the climate_and_economy_simulation_step
-            self.stage = 0#self.timestep % (self.num_negotiation_stages + 1)
+            self.stage = self.timestep % (self.num_negotiation_stages + 1)
             self.set_global_state(
                 "stage", self.stage, self.timestep, dtype=self.int_dtype
             )
