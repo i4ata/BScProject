@@ -62,4 +62,3 @@ def plot_losses(losses : List[List[float]]) -> None:
     plt.xlabel("Training episode")
     plt.legend()
     plt.show()
-        
