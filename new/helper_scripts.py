@@ -3,6 +3,8 @@ from typing import List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 
+import copy
+
 import sys
 sys.path.insert(0, '..')
 from rice import Rice
@@ -12,7 +14,7 @@ def evaluate_agents(env : Rice, agents : List[Agent]) -> Tuple[dict, list, list]
     Measure performance on trained agents on a brand new environment without learning.
     Returns: (global state of the environment, list of collective actions, list of rewards)
     """
-    state = env.reset()
+    state = env.reset() 
     collective_actions = [[] for _ in agents]
     all_rewards = [[] for _ in agents]
     for i in range(env.episode_length):
@@ -25,8 +27,7 @@ def evaluate_agents(env : Rice, agents : List[Agent]) -> Tuple[dict, list, list]
         
         for agent in agents:
             all_rewards[agent.id].append(reward[agent.id])
-
-    return env.global_state, collective_actions, all_rewards
+    return copy.deepcopy(env.global_state), collective_actions, all_rewards
 
 def baseline(env : Rice) -> Tuple[dict, list, list]:
     """
