@@ -60,6 +60,8 @@ def plot_losses(losses : List[List[float]]) -> None:
     for idx, loss in enumerate(losses):
         axs[idx].plot(loss, label = f"Agent {idx}")
         axs[idx].set_ylabel("Loss Value")
+        axs[idx].legend()
+        axs[idx].grid()
+        axs[idx].axhline(c = "red")
     plt.xlabel("Training episode")
-    plt.legend()
     plt.show()

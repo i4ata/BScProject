@@ -67,7 +67,6 @@ class Rice:
         region_yamls_filename = 'region_yamls',
     ):
         """TODO : init docstring"""
-        self.training = True
 
         assert (
             num_discrete_action_levels > 1
@@ -1224,8 +1223,6 @@ class Rice:
 
         # Set the value
         if region_id is None:
-            if not self.training and key == "global_carbon_mass":
-                print(f"{self.timestep}Changed {key} from {self.global_state[key]['value'][timestep]} to {value}")
             self.global_state[key]["value"][timestep] = value
         else:
             self.global_state[key]["value"][timestep, region_id] = value
