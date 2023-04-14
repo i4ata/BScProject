@@ -26,7 +26,10 @@ class ActionNet(nn.Module):
             for space in self.action_space
         ])
 
+        self.value_head = nn.Linear(256, 1)
+
         self.action_mask = None
+        self.values = None
 
     def forward(self, observation : Dict) -> torch.Tensor:
         obs = self.get_flattened_obs(observation)
@@ -38,6 +41,8 @@ class ActionNet(nn.Module):
         concatenated_action_logits_masked = torch.subtract(input = concatenated_action_logits, 
                                                            other = torch.tensor(1 - self.action_mask).reshape(1, -1), 
                                                            alpha = 1e7)
+        
+        self.values = self.value_head(logits)
         
         return torch.reshape(concatenated_action_logits_masked, [len(self.action_space), -1])
 
