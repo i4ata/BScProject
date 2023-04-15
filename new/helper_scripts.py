@@ -1,4 +1,4 @@
-from agent import Agent, recursive_obs_dict_to_spaces_dict
+from agent import Agent
 from typing import List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,9 +45,7 @@ def create_agents(env : Rice) -> List[Agent]:
     for agent_id in initial_state:
         agents.append(
             Agent(
-                #observation_space = get_observation_space(agent_id),
-                #action_space = get_action_space(agent_id),
-                observation_space = recursive_obs_dict_to_spaces_dict(initial_state[agent_id]),
+                observation_space = len(initial_state[agent_id]['features']),
                 action_space = env.action_space[agent_id],
                 id = agent_id
             )

@@ -1,12 +1,9 @@
-from gym.spaces import MultiDiscrete, Dict, Box
+from gym.spaces import MultiDiscrete, Dict
 from torch.distributions import Categorical
-import numpy as np
 import torch
 
 
 from action_net import ActionNet
-
-_BIG_NUMBER = 1e20
 
 class Agent:
 
@@ -31,50 +28,3 @@ class Agent:
         d = Categorical(logits = space)
         action = d.sample()
         return action.item(), d.log_prob(action)
-    
-# Taken from the original repo    
-def recursive_obs_dict_to_spaces_dict(obs):
-    """Recursively return the observation space dictionary
-    for a dictionary of observations
-
-    Args:
-        obs (dict): A dictionary of observations keyed by agent index
-        for a multi-agent environment
-
-    Returns:
-        spaces.Dict: A dictionary of observation spaces
-    """
-    assert isinstance(obs, dict)
-    dict_of_spaces = {}
-    for key, val in obs.items():
-
-        # list of lists are 'listified' np arrays
-        _val = val
-        if isinstance(val, list):
-            _val = np.array(val)
-        elif isinstance(val, (int, np.integer, float, np.floating)):
-            _val = np.array([val])
-
-        # assign Space
-        if isinstance(_val, np.ndarray):
-            large_num = float(_BIG_NUMBER)
-            box = Box(
-                low=-large_num, high=large_num, shape=_val.shape, dtype=_val.dtype
-            )
-            low_high_valid = (box.low < 0).all() and (box.high > 0).all()
-
-            # This loop avoids issues with overflow to make sure low/high are good.
-            while not low_high_valid:
-                large_num = large_num // 2
-                box = Box(
-                    low=-large_num, high=large_num, shape=_val.shape, dtype=_val.dtype
-                )
-                low_high_valid = (box.low < 0).all() and (box.high > 0).all()
-
-            dict_of_spaces[key] = box
-
-        elif isinstance(_val, dict):
-            dict_of_spaces[key] = recursive_obs_dict_to_spaces_dict(_val)
-        else:
-            raise TypeError
-    return Dict(dict_of_spaces)
