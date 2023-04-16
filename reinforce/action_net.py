@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import numpy as np
 from gym.spaces import Dict, MultiDiscrete
 
 _ACTION_MASK = "action_mask"
@@ -16,7 +15,6 @@ class ActionNet(nn.Module):
         self.action_space = action_space
     
         self.layers = nn.Sequential(
-            #nn.Linear(observation_space[_FEATURES].shape[0], 256),
             nn.Linear(observation_space, 256),
             nn.ReLU(),
             nn.Linear(256, 256),
@@ -27,8 +25,6 @@ class ActionNet(nn.Module):
             nn.Linear(256, space.n)
             for space in self.action_space
         ])
-
-        self.value_head = nn.Linear(256, 1)
 
         self.action_mask = None
         self.values = None
@@ -43,8 +39,6 @@ class ActionNet(nn.Module):
         concatenated_action_logits_masked = torch.subtract(input = concatenated_action_logits, 
                                                            other = torch.tensor(1 - self.action_mask).reshape(1, -1), 
                                                            alpha = 1e7)
-        
-        self.values = self.value_head(logits)
         
         return torch.reshape(concatenated_action_logits_masked, [len(self.action_space), -1])
     

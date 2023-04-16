@@ -1,4 +1,4 @@
-from gym.spaces import MultiDiscrete, Dict
+from gym.spaces import MultiDiscrete
 from torch.distributions import Categorical
 import torch
 
@@ -8,7 +8,7 @@ from action_net import ActionNet
 class Agent:
 
     def __init__(self, 
-                 observation_space : Dict, 
+                 observation_space : int, 
                  action_space : MultiDiscrete, 
                  id : int):
         
@@ -17,7 +17,7 @@ class Agent:
 
     def act(self,
             stage : int, 
-            observation : Dict):
+            observation : dict):
         
         probs = self.nets[stage](observation)
         actions, log_probs = zip(*[self.get_action_and_log_prob(space) for space in probs])
