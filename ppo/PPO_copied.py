@@ -3,12 +3,9 @@ import torch.nn as nn
 from torch.distributions import Categorical
 import numpy as np
 
-from collections import deque
-from tqdm import tqdm
 
 ################################## PPO Policy ##################################
 
-_ACTION_MASK = 'action_mask'
 _FEATURES = 'features'
 
 class RolloutBuffer:
@@ -64,22 +61,20 @@ class ActorCritic(nn.Module):
         action_logits = [head(logits) for head in self.actor_heads]
         distributions = [Categorical(logits = logits) for logits in action_logits]
 
-        actions = torch.cat([dist.sample().detach().unsqueeze(0) for dist in distributions])
-        actions_logprobs = torch.cat([dist.log_prob(action).detach().unsqueeze(0) for (dist, action) in zip(distributions, actions)])
+        actions = torch.stack([dist.sample().detach() for dist in distributions])
+        actions_logprobs = torch.stack([dist.log_prob(action).detach() for (dist, action) in zip(distributions, actions)])
         state_val = self.critic(state).detach()
 
         return actions, actions_logprobs, state_val
 
     def evaluate(self, state, actions):
+
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
         distributions = [Categorical(logits = logits) for logits in action_logits]
-
-        actions_logprobs = torch.cat([dist.log_prob(action).unsqueeze(0) 
-                                      for (dist, action) in zip(distributions, actions.T)]).T
         
-        
-        distribution_entropies = torch.cat([dist.entropy().unsqueeze(0) for dist in distributions])
+        actions_logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T
+        distribution_entropies = torch.stack([dist.entropy() for dist in distributions]).T
         state_values = self.critic(state)
         
         return actions_logprobs, state_values, distribution_entropies
@@ -105,13 +100,10 @@ class PPO:
         
         self.MseLoss = nn.MSELoss()
 
-    def _get_flattened_obs(self, state) -> torch.Tensor:
-        return torch.FloatTensor(state[_FEATURES].reshape(1, -1))
-
     def select_action(self, state):
 
         with torch.no_grad():
-            state = self._get_flattened_obs(state)
+            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1))
             actions, actions_logprobs, state_val = self.policy_old.act(state)
             
         self.buffer.states.append(state)
@@ -140,9 +132,10 @@ class PPO:
         old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach()
         old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach()
         old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
+
         # calculate advantages
-        advantages = returns.detach() - old_state_values.detach()
-        
+        advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
+
         # Optimize policy for K epochs
         for _ in range(self.K_epochs):
             
@@ -153,8 +146,7 @@ class PPO:
             state_values = torch.squeeze(state_values)
             
             # Finding the ratio (pi_theta / pi_theta__old)
-            #ratios = torch.exp(logprobs - old_logprobs.detach())
-            ratios = torch.exp(logprobs - old_logprobs.detach()).T
+            ratios = torch.exp(logprobs - old_logprobs.detach())
 
             # Finding Surrogate Loss  
             surr1 = ratios * advantages
