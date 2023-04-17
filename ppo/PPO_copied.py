@@ -55,6 +55,12 @@ class ActorCritic(nn.Module):
     def forward(self):
         raise NotImplementedError
     
+    def act_deterministically(self, state):
+        
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        return list(map(torch.argmax, action_logits))
+
     def act(self, state):
 
         logits = self.actor_layers(state)
@@ -71,8 +77,9 @@ class ActorCritic(nn.Module):
 
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
-        distributions = [Categorical(logits = logits) for logits in action_logits]
-        
+        distributions = [Categorical(logits = logits) for logits in action_logits] 
+
+        # The transpositions (T) are to align the shapes. Not 100% sure that's correct though.
         actions_logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T
         distribution_entropies = torch.stack([dist.entropy() for dist in distributions]).T
         state_values = self.critic(state)
@@ -100,6 +107,8 @@ class PPO:
         
         self.MseLoss = nn.MSELoss()
 
+        self.loss_collection = []
+
     def select_action(self, state):
 
         with torch.no_grad():
@@ -111,6 +120,13 @@ class PPO:
         self.buffer.logprobs.append(actions_logprobs)
         self.buffer.state_values.append(state_val)
 
+        return np.array([action.item() for action in actions])
+    
+    def select_action_deterministically(self, state):
+        
+        with torch.no_grad():
+            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1))
+            actions = self.policy.act_deterministically(state)
         return np.array([action.item() for action in actions])
 
     def update(self):
@@ -157,7 +173,9 @@ class PPO:
             
             # take gradient step
             self.optimizer.zero_grad()
-            loss.mean().backward()
+            loss = loss.mean()
+            self.loss_collection.append(loss.item())
+            loss.backward()
             self.optimizer.step()
             
         # Copy new weights into old policy
