@@ -123,7 +123,7 @@ class PPO:
         return np.array([action.item() for action in actions])
     
     def select_action_deterministically(self, state):
-        
+
         with torch.no_grad():
             state = torch.FloatTensor(state[_FEATURES].reshape(1, -1))
             actions = self.policy.act_deterministically(state)
@@ -174,6 +174,7 @@ class PPO:
             # take gradient step
             self.optimizer.zero_grad()
             loss = loss.mean()
+            #loss = (loss ** 2).mean()
             self.loss_collection.append(loss.item())
             loss.backward()
             self.optimizer.step()

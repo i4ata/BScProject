@@ -73,7 +73,9 @@ def plot_rewards(rewards : Dict[int, List[float]]) -> None:
     fig, axs = plt.subplots(len(rewards), sharex=True, figsize = (10, 10))
     fig.suptitle('Rewards over time')
     for idx in rewards:
-        axs[idx].plot(rewards[idx], label = f"Agent {idx}")
+        axs[idx].plot(rewards[idx], alpha = .2)
+        axs[idx].plot(np.convolve(rewards[idx], np.ones(100)/100, mode='valid'), 
+                      label = f'Agent {idx}', c = 'red')
         axs[idx].set_ylabel("Reward")
         axs[idx].legend()
         axs[idx].grid()
