@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.distributions import Categorical
-import numpy as np
 
 
 ################################## PPO Policy ##################################
@@ -56,30 +55,38 @@ class ActorCritic(nn.Module):
         raise NotImplementedError
     
     def act_deterministically(self, state):
-        
+        """
+        Take the best action in the `state`. `state` needs to be a single state instead of a batch of states.
+        This function is used to evaluate the model by making the policy deterministic.
+        """
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
-        return list(map(torch.argmax, action_logits))
+        return torch.stack(list(map(torch.argmax, action_logits))).detach().numpy()
 
     def act(self, state):
-
+        """
+        Take actions in `state`.
+        Returns the actions (1 per environment action space), the logprobs (1 per action), and the state value (1)
+        """
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
         distributions = [Categorical(logits = logits) for logits in action_logits]
 
         actions = torch.stack([dist.sample().detach() for dist in distributions])
         actions_logprobs = torch.stack([dist.log_prob(action).detach() for (dist, action) in zip(distributions, actions)])
-        state_val = self.critic(state).detach()
+        state_values = self.critic(state).detach()
 
-        return actions, actions_logprobs, state_val
+        return actions.T, actions_logprobs.T, state_values
 
     def evaluate(self, state, actions):
-
+        """
+        Evaluate the action `actions` in state `state`.
+        Returns the logprobs (1 per the action taken in each environment action space), the state value (1) and the entropies of the distributions (1 per action space)
+        """
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
         distributions = [Categorical(logits = logits) for logits in action_logits] 
 
-        # The transpositions (T) are to align the shapes. Not 100% sure that's correct though.
         actions_logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T
         distribution_entropies = torch.stack([dist.entropy() for dist in distributions]).T
         state_values = self.critic(state)
@@ -87,7 +94,7 @@ class ActorCritic(nn.Module):
         return actions_logprobs, state_values, distribution_entropies
 
 class PPO:
-    def __init__(self, state_dim, action_dim, lr_actor = .01, lr_critic = .01, gamma = .9, K_epochs = 10, eps_clip = .2):
+    def __init__(self, state_dim, action_dim, lr_actor = .005, lr_critic = .005, gamma = .9, K_epochs = 10, eps_clip = .2):
 
         self.gamma = gamma
         self.eps_clip = eps_clip
@@ -109,27 +116,37 @@ class PPO:
 
         self.loss_collection = []
 
-    def select_action(self, state):
+    def select_action(self, states):
+        """
+        Select action in state `state` and fill in the rollout buffer with the relevant data
+        """
+        if not isinstance(states, list):
+            states = [states]
 
         with torch.no_grad():
-            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1))
-            actions, actions_logprobs, state_val = self.policy_old.act(state)
-            
-        self.buffer.states.append(state)
-        self.buffer.actions.append(actions)
-        self.buffer.logprobs.append(actions_logprobs)
-        self.buffer.state_values.append(state_val)
+            states = torch.cat(list(map(lambda state: torch.FloatTensor(state[_FEATURES].reshape(1, -1)), states)))
+            actions, actions_logprobs, state_val = self.policy_old.act(states)
 
-        return np.array([action.item() for action in actions])
+        self.buffer.states.extend(states)
+        self.buffer.actions.extend(actions)
+        self.buffer.logprobs.extend(actions_logprobs)
+        self.buffer.state_values.extend(state_val)
+
+        return [action.numpy() for action in actions]
     
     def select_action_deterministically(self, state):
-
+        """
+        Act deterministically in state `state`
+        """
         with torch.no_grad():
             state = torch.FloatTensor(state[_FEATURES].reshape(1, -1))
             actions = self.policy.act_deterministically(state)
-        return np.array([action.item() for action in actions])
-
+        return actions
+    
     def update(self):
+        """
+        Update the policy with PPO
+        """
         # Monte Carlo estimate of returns
         returns = []
         discounted_return = 0
