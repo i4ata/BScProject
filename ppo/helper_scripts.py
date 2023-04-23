@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict
 from copy import deepcopy
 
-from PPO_copied import PPO
+from PPO import PPO
 
 import sys
 sys.path.insert(0, '..')
 from rice import Rice
 
-def create_agents(env : Rice) -> List[PPO]:
+def create_agents(env : Rice, params) -> List[PPO]:
     """
     Create agents that receive only the features of the environment as inputs, (not the action masks)
     """
@@ -19,15 +19,15 @@ def create_agents(env : Rice) -> List[PPO]:
         agents.append(
             PPO(
                 state_dim = len(initial_state[i]['features']), 
-                action_dim = env.action_space[i]
+                action_dim = env.action_space[i],
+                params = params
             )
         )
     return agents
 
 def evaluate_agents(agents : List[PPO], env : Rice) -> Tuple[dict, dict, dict]:
     """
-    Evaluate agents on a new environment episode (policies are stochastic)
-    TODO: Make policies deterministic for evaluation
+    Evaluate agents on a new environment episode (policies are deterministic)
     """
     state = env.reset()
     actions = {i : [] for i in range(len(agents))}

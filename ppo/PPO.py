@@ -26,30 +26,31 @@ class RolloutBuffer:
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_space, action_space):
+    def __init__(self, state_space, action_space, params):
         super(ActorCritic, self).__init__()
 
         # actor
-        self.actor_layers = nn.Sequential(
-                        nn.Linear(state_space, 64),
-                        nn.Tanh(),
-                        nn.Linear(64, 64),
-                        nn.Tanh(),
-                        nn.Linear(64, 64)
-                    )
+        self.actor_layers = [nn.Linear(state_space, params['hidden_size_actor'])]
+        for actor_layer in range(params['n_layers_actor']):
+            self.actor_layers.extend([
+                nn.Linear(params['hidden_size_actor'], params['hidden_size_actor']),
+                nn.Tanh()
+            ])
+        self.actor_layers = nn.Sequential(*self.actor_layers)
         self.actor_heads = nn.ModuleList([
-            nn.Linear(64, space.n)
+            nn.Linear(params['hidden_size_actor'], space.n)
             for space in action_space
         ])
 
         # critic
-        self.critic = nn.Sequential(
-                        nn.Linear(state_space, 64),
-                        nn.Tanh(),
-                        nn.Linear(64, 64),
-                        nn.Tanh(),
-                        nn.Linear(64, 1)
-                    )
+        self.critic = [nn.Linear(state_space, params['hidden_size_critic'])]
+        for critic_layer in range(params['n_layers_critic']):
+            self.critic.extend([
+                nn.Linear(params['hidden_size_critic'], params['hidden_size_critic']),
+                nn.Tanh()
+            ])
+        self.critic.append(nn.Linear(params['hidden_size_critic'], 1))
+        self.critic = nn.Sequential(*self.critic)
         
     def forward(self):
         raise NotImplementedError
@@ -94,22 +95,20 @@ class ActorCritic(nn.Module):
         return actions_logprobs, state_values, distribution_entropies
 
 class PPO:
-    def __init__(self, state_dim, action_dim, lr_actor = .005, lr_critic = .005, gamma = .9, K_epochs = 10, eps_clip = .2):
+    def __init__(self, state_dim, action_dim, params):
 
-        self.gamma = gamma
-        self.eps_clip = eps_clip
-        self.K_epochs = K_epochs
+        self.params = params
         
         self.buffer = RolloutBuffer()
 
-        self.policy = ActorCritic(state_dim, action_dim)
+        self.policy = ActorCritic(state_dim, action_dim, params)
         actor_parameters = list(self.policy.actor_layers.parameters()) + list(self.policy.actor_heads.parameters())
         self.optimizer = torch.optim.Adam([
-                        {'params': actor_parameters, 'lr': lr_actor},
-                        {'params': self.policy.critic.parameters(), 'lr': lr_critic}
+                        {'params': actor_parameters, 'lr': params['lr_actor']},
+                        {'params': self.policy.critic.parameters(), 'lr': params['lr_critic']}
                     ])
 
-        self.policy_old = ActorCritic(state_dim, action_dim)
+        self.policy_old = ActorCritic(state_dim, action_dim, params)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
@@ -153,7 +152,7 @@ class PPO:
         for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
             if is_terminal:
                 discounted_return = 0
-            discounted_return = reward + (self.gamma * discounted_return)
+            discounted_return = reward + (self.params['gamma'] * discounted_return)
             returns.insert(0, discounted_return)
 
         # Normalizing the rewards
@@ -170,7 +169,7 @@ class PPO:
         advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
 
         # Optimize policy for K epochs
-        for _ in range(self.K_epochs):
+        for _ in range(self.params['K_epochs']):
             
             # Evaluating old actions and values
             logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
@@ -183,10 +182,10 @@ class PPO:
 
             # Finding Surrogate Loss  
             surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
+            surr2 = torch.clamp(ratios, 1 - self.params['eps_clip'], 1 + self.params['eps_clip']) * advantages
 
             # final loss of clipped objective PPO
-            loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(state_values, returns) - 0.01 * dist_entropy
+            loss = -torch.min(surr1, surr2) + self.params['critic_loss_parameter'] * self.MseLoss(state_values, returns) - self.params['entropy_parameter'] * dist_entropy
             
             # take gradient step
             self.optimizer.zero_grad()
