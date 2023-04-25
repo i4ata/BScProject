@@ -167,7 +167,7 @@ class PPO:
         old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
 
         # calculate advantages
-        advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
+        advantages = (returns.detach() - old_state_values.detach().cpu()).unsqueeze(1)
 
         # Optimize policy for K epochs
         for _ in range(self.params['K_epochs']):
