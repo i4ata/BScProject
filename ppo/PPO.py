@@ -62,7 +62,7 @@ class ActorCritic(nn.Module):
         """
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
-        return torch.stack(list(map(torch.argmax, action_logits))).detach().numpy()
+        return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
 
     def act(self, state):
         """
@@ -132,7 +132,7 @@ class PPO:
         self.buffer.logprobs.extend(actions_logprobs)
         self.buffer.state_values.extend(state_val)
 
-        return [action.numpy() for action in actions]
+        return [action.cpu().numpy() for action in actions]
     
     def select_action_deterministically(self, state):
         """
