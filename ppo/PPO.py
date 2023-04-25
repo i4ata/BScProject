@@ -95,20 +95,21 @@ class ActorCritic(nn.Module):
         return actions_logprobs, state_values, distribution_entropies
 
 class PPO:
-    def __init__(self, state_dim, action_dim, params):
+    def __init__(self, state_dim, action_dim, params, device):
 
         self.params = params
+        self.device = device
         
         self.buffer = RolloutBuffer()
 
-        self.policy = ActorCritic(state_dim, action_dim, params)
+        self.policy = ActorCritic(state_dim, action_dim, params).to(device)
         actor_parameters = list(self.policy.actor_layers.parameters()) + list(self.policy.actor_heads.parameters())
         self.optimizer = torch.optim.Adam([
                         {'params': actor_parameters, 'lr': params['lr_actor']},
                         {'params': self.policy.critic.parameters(), 'lr': params['lr_critic']}
                     ])
 
-        self.policy_old = ActorCritic(state_dim, action_dim, params)
+        self.policy_old = ActorCritic(state_dim, action_dim, params).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())
         
         self.MseLoss = nn.MSELoss()
@@ -123,7 +124,7 @@ class PPO:
             states = [states]
 
         with torch.no_grad():
-            states = torch.cat(list(map(lambda state: torch.FloatTensor(state[_FEATURES].reshape(1, -1)), states)))
+            states = torch.cat(list(map(lambda state: torch.FloatTensor(state[_FEATURES].reshape(1, -1)), states))).to(self.device)
             actions, actions_logprobs, state_val = self.policy_old.act(states)
 
         self.buffer.states.extend(states)
@@ -138,7 +139,7 @@ class PPO:
         Act deterministically in state `state`
         """
         with torch.no_grad():
-            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1))
+            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1)).to(self.device)
             actions = self.policy.act_deterministically(state)
         return actions
     

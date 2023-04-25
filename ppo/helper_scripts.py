@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, '..')
 from rice import Rice
 
-def create_agents(env : Rice, params) -> List[PPO]:
+def create_agents(env : Rice, params : dict, device : str) -> List[PPO]:
     """
     Create agents that receive only the features of the environment as inputs, (not the action masks)
     """
@@ -20,7 +20,8 @@ def create_agents(env : Rice, params) -> List[PPO]:
             PPO(
                 state_dim = len(initial_state[i]['features']), 
                 action_dim = env.action_space[i],
-                params = params
+                params = params,
+                device = device
             )
         )
     return agents
