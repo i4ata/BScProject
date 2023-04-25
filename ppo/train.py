@@ -5,7 +5,9 @@ sys.path.append("..")
 from rice import Rice
 
 import numpy as np
-import optuna
+
+import torch
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def objective(trial):
     twos = [2 ** n for n in range(11)]
@@ -29,7 +31,7 @@ def objective(trial):
     }
 
     envs = [Rice(region_yamls_filename='fewer_region_yamls') for _ in range(params['n_envs'])]
-    agents = create_agents(envs[0], params)
+    agents = create_agents(envs[0], params, device)
     episode_length = envs[0].episode_length
 
 
