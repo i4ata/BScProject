@@ -34,8 +34,6 @@ def objective(trial):
     agents = create_agents(envs[0], params, device)
     episode_length = envs[0].episode_length
 
-
-    rewards_collection = []
     for epoch in range(params['epochs']):
         for batch in range(params['batch_size']):
             states = [env.reset() for env in envs]
@@ -59,10 +57,22 @@ def objective(trial):
 
         for agent in agents:
             agent.update()
-        rewards_collection.append(eval(agents, envs[0]))
+        #rewards_collection.append(eval(agents, envs[0]))
 
-    return np.mean(rewards_collection)
+    return eval_stochastic(agents, envs[0])
 
+def eval_stochastic(agents, env, evaluation_steps = 100):
+    mean_reward = 0
+    for step in range(evaluation_steps):
+        state = env.reset()
+        for t in range(env.episode_length):
+            collective_action = {
+                i : agents[i].select_action(state[i])
+                for i in range(len(agents))
+            }
+            state, reward, _, _ = env.step(collective_action)
+            mean_reward += sum(reward.values())
+    return mean_reward / (env.episode_length * len(agents) * evaluation_steps)
 
 def eval(agents, env):
     rewards = {i : [] for i in range(len(agents))}
