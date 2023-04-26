@@ -67,7 +67,7 @@ def eval_stochastic(agents, env, evaluation_steps = 100):
         state = env.reset()
         for t in range(env.episode_length):
             collective_action = {
-                i : agents[i].select_action(state[i])
+                i : agents[i].select_action_stochastically(state[i])
                 for i in range(len(agents))
             }
             state, reward, _, _ = env.step(collective_action)

@@ -63,6 +63,16 @@ class ActorCritic(nn.Module):
         logits = self.actor_layers(state)
         action_logits = [head(logits) for head in self.actor_heads]
         return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
+    
+    def act_stochastically(self, state):
+        """
+        Take an action in the `state`. `state` needs to be a single state instead of a batch of states.
+        This function is used to evaluate the model.
+        """
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        distributions = [Categorical(logits = logits) for logits in action_logits]
+        return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
 
     def act(self, state):
         """
@@ -141,6 +151,15 @@ class PPO:
         with torch.no_grad():
             state = torch.FloatTensor(state[_FEATURES].reshape(1, -1)).to(self.device)
             actions = self.policy.act_deterministically(state)
+        return actions
+
+    def select_action_stochastically(self, state):
+        """
+        Act stochastically in state `state`
+        """
+        with torch.no_grad():
+            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1)).to(self.device)
+            actions = self.policy.act_stochastically(state)
         return actions
     
     def update(self):
