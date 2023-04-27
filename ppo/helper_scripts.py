@@ -9,7 +9,26 @@ import sys
 sys.path.insert(0, '..')
 from rice import Rice
 
-def create_agents(env : Rice, params : dict, device : str) -> List[PPO]:
+default_params = {
+    'n_envs' : 4,
+    'epochs' : 20,
+    'batch_size' : 4,
+    'K_epochs' : 30,
+
+    'n_layers_actor' : 3,
+    'n_layers_critic' : 3,
+    'hidden_size_actor' : 64,
+    'hidden_size_critic' : 64,
+    
+    'gamma' : .99,
+    'lr_actor' : 1e-3,
+    'lr_critic' : 1e-3,
+    'eps_clip' : .2,
+    'entropy_parameter' : .01,
+    'critic_loss_parameter' : .5
+}
+
+def create_agents(env : Rice, params : dict = default_params, device : str = 'cpu') -> List[PPO]:
     """
     Create agents that receive only the features of the environment as inputs, (not the action masks)
     """

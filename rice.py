@@ -126,7 +126,6 @@ class Rice:
         #
 
 
-
         # Notation nvec: vector of counts of each categorical variable
         # Each region sets mitigation and savings rates
         self.savings_action_nvec = [self.num_discrete_action_levels]
@@ -154,7 +153,7 @@ class Rice:
 
         # Set the default action mask (all ones)
         self.len_actions = sum(self.actions_nvec)
-        self.default_agent_action_mask = np.ones(self.len_actions, dtype=self.int_dtype)
+        self.default_agent_action_mask = np.ones(self.len_actions, dtype=bool).reshape(-1, self.num_discrete_action_levels)
         
         self.agent_action_masks = {
             region_id : self.default_agent_action_mask
@@ -163,11 +162,6 @@ class Rice:
         
         # Add num_agents attribute (for use with WarpDrive)
         self.num_agents = self.num_regions
-
-    def set_mask(self, region_id, mask):
-        assert len(mask) == self.len_actions
-        assert region_id in range(self.num_regions)
-        self.agent_action_masks[region_id] = mask
 
     def reset(self):
         """

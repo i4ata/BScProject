@@ -6,6 +6,7 @@ from torch.distributions import Categorical
 ################################## PPO Policy ##################################
 
 _FEATURES = 'features'
+_ACTION_MASK = 'action_mask'
 
 class RolloutBuffer:
     def __init__(self):
@@ -74,13 +75,14 @@ class ActorCritic(nn.Module):
         distributions = [Categorical(logits = logits) for logits in action_logits]
         return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
 
-    def act(self, state):
+    def act(self, state, mask):
         """
         Take actions in `state`.
         Returns the actions (1 per environment action space), the logprobs (1 per action), and the state value (1)
         """
         logits = self.actor_layers(state)
-        action_logits = [head(logits) for head in self.actor_heads]
+        action_logits = [torch.subtract(head(logits), 1 - mask[:, i], alpha = 1e5) 
+                         for (i, head) in enumerate(self.actor_heads)]
         distributions = [Categorical(logits = logits) for logits in action_logits]
 
         actions = torch.stack([dist.sample().detach() for dist in distributions])
@@ -109,6 +111,8 @@ class PPO:
 
         self.params = params
         self.device = device
+
+        self.action_mask = torch.ones(sum(space.n for space in action_dim), dtype=torch.uint8).reshape(len(action_dim), -1).to(device)
         
         self.buffer = RolloutBuffer()
 
@@ -132,10 +136,11 @@ class PPO:
         """
         if not isinstance(states, list):
             states = [states]
-
+            
         with torch.no_grad():
-            states = torch.stack(list(map(lambda state: torch.FloatTensor(state[_FEATURES]), states))).to(self.device)
-            actions, actions_logprobs, state_val = self.policy_old.act(states)
+            states_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_FEATURES]), states))).to(self.device)
+            masks_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_ACTION_MASK]), states))).to(self.device)
+            actions, actions_logprobs, state_val = self.policy_old.act(states_tensor, masks_tensor)
 
         self.buffer.states.extend(states)
         self.buffer.actions.extend(actions)
@@ -227,8 +232,3 @@ class PPO:
     def load(self, checkpoint_path):
         self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
         self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
-        
-        
-       
-
-
