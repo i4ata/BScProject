@@ -215,7 +215,6 @@ class PPO:
             # take gradient step
             self.optimizer.zero_grad()
             loss = loss.mean()
-            #loss = (loss ** 2).mean()
             self.loss_collection.append(loss.item())
             loss.backward()
             self.optimizer.step()
