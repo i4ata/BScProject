@@ -11,24 +11,27 @@ from rice import Rice
 
 from typing import Tuple
 
-class DecisionNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict, device : str):
+class ActivityNet(ActorCritic):
+    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = None):
+        
+        super(ActivityNet, self).__init__()
 
-        # action space needs to be equal to the number of agents. The output of the model is the probability
-        # of accepting each proposal
-        # state space needs to be the number of agents * 2 * size of action mask
-        self.state_space = n_features + 2 * env.num_agents * env.len_actions
-        self.action_space = env.num_agents
-        self.device = device
+        self.state_space = n_features
+        self.action_space = env.action_space
+        self.action_mask = env.default_agent_action_mask
 
-        self.actor = nn.Sequential(
+        self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),
-            nn.Linear(64, env.action_space),
-            nn.Sigmoid()
+            nn.Linear(64, 64),
+            nn.Tanh()
         )
+        self.actor_heads = nn.ModuleList([
+            nn.Linear(64, space.n)
+            for space in self.action_space
+        ])
 
         self.critic = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -38,32 +41,45 @@ class DecisionNet(ActorCritic):
             nn.Linear(64, 1)
         )
 
-    def forward(self, x):
+    def forward(self):
         raise NotImplementedError
     
-    def act(self, state : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
-        probs = self.actor(state)
-        state_value = self.critic(state)
-        actions = (torch.rand(probs.shape).to(self.device) < probs) * 1
-        log_probs = torch.log(torch.abs(actions - probs))
-
-        return actions, log_probs, state_value
-
-    def evaluate(self, state : torch.Tensor, actions : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        probs = self.actor(state)
-        state_value = self.critic(state)
-        log_probs = torch.log(torch.abs(actions - probs))
-        
-        entropies = - probs * torch.log2(probs) - (1 - probs) * torch.log2(1 - probs)
-        
-        return log_probs, state_value, entropies
-    
     def act_deterministically(self, state : torch.Tensor) -> np.ndarray:
-        probs = self.actor(state)
-        return ((probs > .5) * 1).detach().cpu().numpy()
+        with torch.no_grad():
+            logits = self.actor_layers(state)
+            action_logits = [head(logits) for head in self.actor_heads]
+        return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
     
     def act_stochastically(self, state : torch.Tensor) -> np.ndarray:
-        probs = self.actor(state)
-        return ((torch.rand(probs.shape).to(self.device) < probs) * 1).detach().cpu().numpy()
+        with torch.no_grad():
+            logits = self.actor_layers(state)
+            action_logits = [head(logits) for head in self.actor_heads]
+            distributions = [Categorical(logits = logits) for logits in action_logits]
+        return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
+
+    def act(self, state : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        with torch.no_grad():
+            logits = self.actor_layers(state)
+            action_logits = [torch.subtract(head(logits), 1 - self.action_mask[:, i], alpha = 1e5) 
+                            for (i, head) in enumerate(self.actor_heads)]
+            distributions = [Categorical(logits = logits) for logits in action_logits]
+
+            actions = torch.stack([dist.sample().detach() for dist in distributions])
+            actions_logprobs = torch.stack([dist.log_prob(action).detach() for (dist, action) in zip(distributions, actions)])
+            state_values = self.critic(state).detach()
+
+        return actions.T, actions_logprobs.T, state_values
+
+    def evaluate(self, state : torch.Tensor, actions : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        distributions = [Categorical(logits = logits) for logits in action_logits] 
+
+        actions_logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T
+        distribution_entropies = torch.stack([dist.entropy() for dist in distributions]).T
+        state_values = self.critic(state)
         
+        return actions_logprobs, state_values, distribution_entropies
+
+    def get_actor_params(self):
+        return list(self.actor_layers.parameters()) + list(self.actor_heads.parameters())

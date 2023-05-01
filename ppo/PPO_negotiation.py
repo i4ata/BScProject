@@ -75,8 +75,13 @@ class PPO:
         """
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
+        if not isinstance(states, list):
+            states = [states]
             
-        actions, actions_logprobs, state_val = self.policy_old.act(states)
+        with torch.no_grad():
+            states_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_FEATURES]), states))).to(self.device)
+            masks_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_ACTION_MASK]), states))).to(self.device)
+            actions, actions_logprobs, state_val = self.policy_old.act(states_tensor, masks_tensor)
 
         self.buffer.states.extend(states)
         self.buffer.actions.extend(actions)
@@ -84,6 +89,24 @@ class PPO:
         self.buffer.state_values.extend(state_val)
 
         return [action.cpu().numpy() for action in actions]
+    
+    def select_action_deterministically(self, state):
+        """
+        Act deterministically in state `state`
+        """
+        with torch.no_grad():
+            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1)).to(self.device)
+            actions = self.policy.act_deterministically(state)
+        return actions
+
+    def select_action_stochastically(self, state):
+        """
+        Act stochastically in state `state`
+        """
+        with torch.no_grad():
+            state = torch.FloatTensor(state[_FEATURES].reshape(1, -1)).to(self.device)
+            actions = self.policy.act_stochastically(state)
+        return actions
     
     def update(self):
         """
@@ -95,7 +118,7 @@ class PPO:
         for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
             if is_terminal:
                 discounted_return = 0
-            discounted_return = reward + .9 * discounted_return
+            discounted_return = reward + (self.params['gamma'] * discounted_return)
             returns.insert(0, discounted_return)
 
         # Normalizing the rewards
@@ -112,7 +135,7 @@ class PPO:
         advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
 
         # Optimize policy for K epochs
-        for _ in range(10):
+        for _ in range(self.params['K_epochs']):
             
             # Evaluating old actions and values
             logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
@@ -125,10 +148,10 @@ class PPO:
 
             # Finding Surrogate Loss  
             surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, .8, 1.2) * advantages
+            surr2 = torch.clamp(ratios, 1 - self.params['eps_clip'], 1 + self.params['eps_clip']) * advantages
 
             # final loss of clipped objective PPO
-            loss = -torch.min(surr1, surr2) + .5 * self.MseLoss(state_values, returns) - .01 * dist_entropy
+            loss = -torch.min(surr1, surr2) + self.params['critic_loss_parameter'] * self.MseLoss(state_values, returns) - self.params['entropy_parameter'] * dist_entropy
             
             # take gradient step
             self.optimizer.zero_grad()
