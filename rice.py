@@ -160,6 +160,9 @@ class Rice:
             for region_id in range(self.num_regions)
         }
         
+        self.promises = np.tile(self.default_agent_action_mask, (self.num_regions, 1, 1))
+        self.proposals = np.tile(self.default_agent_action_mask, (self.num_regions, 1, 1))
+
         # Add num_agents attribute (for use with WarpDrive)
         self.num_agents = self.num_regions
 

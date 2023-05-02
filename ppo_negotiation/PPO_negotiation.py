@@ -28,7 +28,7 @@ class RolloutBuffer:
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_space, action_space, params):
+    def __init__(self):
         super(ActorCritic, self).__init__()
         pass
         

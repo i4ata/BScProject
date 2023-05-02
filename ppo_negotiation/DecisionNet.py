@@ -11,7 +11,7 @@ from rice import Rice
 from typing import Tuple
 
 class DecisionNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = None):
+    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
 
         super(DecisionNet, self).__init__()
 
@@ -19,7 +19,7 @@ class DecisionNet(ActorCritic):
         # of accepting each proposal
         # state space needs to be the number of agents * 2 * size of action mask
         self.state_space = n_features + 2 * env.num_agents * env.len_actions
-        self.action_space = env.num_agents
+        self.action_space = env.num_agents - 1
         self.device = device
 
         self.actor = nn.Sequential(
@@ -27,7 +27,7 @@ class DecisionNet(ActorCritic):
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),
-            nn.Linear(64, env.action_space),
+            nn.Linear(64, self.action_space),
             nn.Sigmoid()
         )
 

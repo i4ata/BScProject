@@ -12,13 +12,15 @@ from rice import Rice
 from typing import Tuple
 
 class ActivityNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = None):
+    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
         
         super(ActivityNet, self).__init__()
 
         self.state_space = n_features
-        self.action_space = env.action_space
+        self.action_space = env.action_space[0] #? fix that
         self.action_mask = env.default_agent_action_mask
+
+        self.device = device
 
         self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -81,5 +83,5 @@ class ActivityNet(ActorCritic):
         
         return actions_logprobs, state_values, distribution_entropies
 
-    def get_actor_params(self):
+    def get_actor_parameters(self):
         return list(self.actor_layers.parameters()) + list(self.actor_heads.parameters())

@@ -7,5 +7,6 @@ sys.path.append("..")
 from rice import Rice
 
 class Agent():
-    def __init__(self, env : Rice, intial_state : dict):
-        self.nets = [DecisionNet(env, len(intial_state['features'])), ActivityNet(env, len(intial_state['features']))]
+    def __init__(self, env : Rice, intial_state : dict, device : str = 'cpu'):
+        self.decisionNet = PPO(model = DecisionNet(env, len(intial_state['features'])), params = None, device = device)
+        self.activityNet = PPO(model = ActivityNet(env, len(intial_state['features'])), params = None, device = device)

@@ -26,7 +26,6 @@ class RolloutBuffer:
         del self.state_values[:]
         del self.is_terminals[:]
 
-
 class ActorCritic(nn.Module):
     def __init__(self, state_space, action_space, params):
         super(ActorCritic, self).__init__()
@@ -75,9 +74,6 @@ class PPO:
         """
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
-        if not isinstance(states, list):
-            states = [states]
-            
         with torch.no_grad():
             states_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_FEATURES]), states))).to(self.device)
             masks_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_ACTION_MASK]), states))).to(self.device)
