@@ -83,7 +83,8 @@ class PPO:
         self.buffer.logprobs.extend(actions_logprobs)
         self.buffer.state_values.extend(state_val)
 
-        return [action.cpu().numpy() for action in actions]
+        #return [action.cpu().numpy() for action in actions]
+        return actions.cpu().numpy()
     
     def update(self):
         """

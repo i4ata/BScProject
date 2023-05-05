@@ -156,13 +156,24 @@ class Rice:
         self.default_agent_action_mask = np.ones(self.len_actions, dtype=bool).reshape(-1, self.num_discrete_action_levels)
         
         self.agent_action_masks = {
-            region_id : self.default_agent_action_mask
+            region_id : np.copy(self.default_agent_action_mask)
             for region_id in range(self.num_regions)
         }
         
-        self.promises = np.tile(self.default_agent_action_mask, (self.num_regions, 1, 1))
-        self.proposals = np.tile(self.default_agent_action_mask, (self.num_regions, 1, 1))
+        self.promises = {
+            region_id : np.copy(self.default_agent_action_mask)
+            for region_id in range(self.num_regions)
+        }
 
+        self.proposals = {
+            sender : {
+                receiver : np.copy(self.default_agent_action_mask) 
+                for receiver in range(self.num_regions) 
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+        
         # Add num_agents attribute (for use with WarpDrive)
         self.num_agents = self.num_regions
 
@@ -377,6 +388,23 @@ class Rice:
         assert self.timestep >= n
         self.timestep -= n
         return self.generate_observation()
+
+    def update_mask(self, region_id : int, decisions : np.ndarray):
+        proposals = [self.proposals[sender][region_id] for sender in range(self.num_agents) if sender != region_id]
+        
+        self.agent_action_masks[region_id] = np.logical_and.reduce(
+            [
+                accepted_proposal
+                for (i, accepted_proposal) in enumerate(proposals) 
+                if decisions[i]
+            ] + [self.promises[region_id]]
+        )
+
+    def make_proposals(self, sender_id : int, actions : np.ndarray):
+        actions = actions.reshape(([-1] + list(self.default_agent_action_mask.shape)))
+        self.promises[sender_id] = actions[0]
+        for (i, receiver_id) in enumerate(self.proposals[sender_id]):
+            self.proposals[sender_id][receiver_id] = actions[i + 1]
 
     def generate_observation(self):
         """

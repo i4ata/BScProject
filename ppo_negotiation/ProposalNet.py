@@ -10,16 +10,16 @@ from rice import Rice
 
 from typing import Tuple
 
-class DecisionNet(ActorCritic):
+class ProposalNet(ActorCritic):
     def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
 
-        super(DecisionNet, self).__init__()
+        super(ProposalNet, self).__init__()
 
         # action space needs to be equal to the number of agents. The output of the model is the probability
         # of accepting each proposal
         # state space needs to be the number of agents * 2 * size of action mask
-        self.state_space = n_features + 2 * (env.num_agents - 1) * env.len_actions
-        self.action_space = env.num_agents - 1
+        self.state_space = n_features
+        self.action_space = env.num_agents * env.len_actions
         self.device = device
 
         self.actor = nn.Sequential(
