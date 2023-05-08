@@ -15,10 +15,7 @@ class DecisionNet(ActorCritic):
 
         super(DecisionNet, self).__init__()
 
-        # action space needs to be equal to the number of agents. The output of the model is the probability
-        # of accepting each proposal
-        # state space needs to be the number of agents * 2 * size of action mask
-        self.state_space = n_features + 2 * (env.num_agents - 1) * env.len_actions
+        self.state_space = n_features + (2 * env.num_agents - 1) * env.len_actions
         self.action_space = env.num_agents - 1
         self.device = device
 

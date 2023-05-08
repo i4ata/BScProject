@@ -184,7 +184,7 @@ class PPO:
         old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach()
         old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach()
         old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
-
+        print(old_states.shape)
         # calculate advantages
         advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
 

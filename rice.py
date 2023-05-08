@@ -48,6 +48,8 @@ logging.getLogger().setLevel(logging.ERROR)
 
 _FEATURES = "features"
 _ACTION_MASK = "action_mask"
+_PROMISES = "promises"
+_PROPOSALS = "proposals"
 
 
 class Rice:
@@ -450,6 +452,12 @@ class Rice:
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
                 _ACTION_MASK: self.agent_action_masks[region_id],
+                _PROMISES: self.promises,
+                _PROPOSALS: {
+                    sender_id: self.proposals[sender_id][region_id]
+                    for sender_id in range(self.num_agents)
+                    if sender_id != region_id
+                }
             }
 
         return obs_dict

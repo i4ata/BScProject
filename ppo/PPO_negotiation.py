@@ -27,28 +27,80 @@ class RolloutBuffer:
         del self.is_terminals[:]
 
 class ActorCritic(nn.Module):
+
     def __init__(self, state_space, action_space, params):
         super(ActorCritic, self).__init__()
-        pass
+        # actor
+        self.actor_layers = [nn.Linear(state_space, params['hidden_size_actor'])]
+        for actor_layer in range(params['n_layers_actor']):
+            self.actor_layers.extend([
+                nn.Linear(params['hidden_size_actor'], params['hidden_size_actor']),
+                nn.Tanh()
+            ])
+        self.actor_layers = nn.Sequential(*self.actor_layers)
+        self.actor_heads = nn.ModuleList([
+            nn.Linear(params['hidden_size_actor'], space.n)
+            for space in action_space
+        ])
+        # critic
+        self.critic = [nn.Linear(state_space, params['hidden_size_critic'])]
+        for critic_layer in range(params['n_layers_critic']):
+            self.critic.extend([
+                nn.Linear(params['hidden_size_critic'], params['hidden_size_critic']),
+                nn.Tanh()
+            ])
+        self.critic.append(nn.Linear(params['hidden_size_critic'], 1))
+        self.critic = nn.Sequential(*self.critic)
         
     def forward(self):
         raise NotImplementedError
     
     def act_deterministically(self, state):
-        pass
+        """
+        Take the best action in the `state`. `state` needs to be a single state instead of a batch of states.
+        This function is used to evaluate the model by making the policy deterministic.
+        """
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
     
     def act_stochastically(self, state):
-        pass
-
-    def act(self, state, mask):
-        pass
-
+        """
+        Take an action in the `state`. `state` needs to be a single state instead of a batch of states.
+        This function is used to evaluate the model.
+        """
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        distributions = [Categorical(logits = logits) for logits in action_logits]
+        return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
+    
+    def act(self, state):
+        """
+        Take actions in `state`.
+        Returns the actions (1 per environment action space), the logprobs (1 per action), and the state value (1)
+        """
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        distributions = [Categorical(logits = logits) for logits in action_logits]
+        actions = torch.stack([dist.sample().detach() for dist in distributions])
+        actions_logprobs = torch.stack([dist.log_prob(action).detach() for (dist, action) in zip(distributions, actions)])
+        state_values = self.critic(state).detach()
+        return actions.T, actions_logprobs.T, state_values
+    
     def evaluate(self, state, actions):
-        pass
-
-    def get_actor_parameters(self):
-        pass
-
+        """
+        Evaluate the action `actions` in state `state`.
+        Returns the logprobs (1 per the action taken in each environment action space), the state value (1) and the entropies of the distributions (1 per action space)
+        """
+        logits = self.actor_layers(state)
+        action_logits = [head(logits) for head in self.actor_heads]
+        distributions = [Categorical(logits = logits) for logits in action_logits] 
+        actions_logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T
+        distribution_entropies = torch.stack([dist.entropy() for dist in distributions]).T
+        state_values = self.critic(state)
+        
+        return actions_logprobs, state_values, distribution_entropies
+    
 class PPO:
     def __init__(self, model : ActorCritic, params : dict, device : str):
 
@@ -76,8 +128,7 @@ class PPO:
         """
         with torch.no_grad():
             states_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_FEATURES]), states))).to(self.device)
-            masks_tensor = torch.stack(list(map(lambda state: torch.FloatTensor(state[_ACTION_MASK]), states))).to(self.device)
-            actions, actions_logprobs, state_val = self.policy_old.act(states_tensor, masks_tensor)
+            actions, actions_logprobs, state_val = self.policy_old.act(states_tensor)
 
         self.buffer.states.extend(states)
         self.buffer.actions.extend(actions)
