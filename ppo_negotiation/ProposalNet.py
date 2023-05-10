@@ -11,14 +11,13 @@ from rice import Rice
 from typing import Tuple
 
 class ProposalNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
+    def __init__(self, env : Rice, n_features: int, params : dict = None):
 
         super(ProposalNet, self).__init__()
 
         self.state_space = n_features
         self.action_space = env.num_agents * env.len_actions
-        self.device = device
-
+        
         self.actor = nn.Sequential(
             nn.Linear(self.state_space, 64),
             nn.Tanh(),
@@ -26,7 +25,7 @@ class ProposalNet(ActorCritic):
             nn.Tanh(),
             nn.Linear(64, self.action_space),
             nn.Sigmoid()
-        ).to(self.device)
+        )
 
         self.critic = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -34,8 +33,8 @@ class ProposalNet(ActorCritic):
             nn.Linear(64, 64),
             nn.Tanh(),
             nn.Linear(64, 1)
-        ).to(self.device)
-
+        )
+        
     def forward(self, x):
         raise NotImplementedError
     

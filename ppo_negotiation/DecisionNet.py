@@ -11,13 +11,12 @@ from rice import Rice
 from typing import Tuple
 
 class DecisionNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
+    def __init__(self, env : Rice, n_features: int, params : dict = None):
 
         super(DecisionNet, self).__init__()
 
         self.state_space = n_features + (2 * env.num_agents - 1) * env.len_actions
         self.action_space = env.num_agents - 1
-        self.device = device
 
         self.actor = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -26,7 +25,7 @@ class DecisionNet(ActorCritic):
             nn.Tanh(),
             nn.Linear(64, self.action_space),
             nn.Sigmoid()
-        ).to(self.device)
+        )
 
         self.critic = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -34,7 +33,7 @@ class DecisionNet(ActorCritic):
             nn.Linear(64, 64),
             nn.Tanh(),
             nn.Linear(64, 1)
-        ).to(self.device)
+        )
 
     def forward(self, x):
         raise NotImplementedError

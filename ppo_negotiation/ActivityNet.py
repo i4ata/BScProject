@@ -12,15 +12,13 @@ from rice import Rice
 from typing import Tuple, List
 
 class ActivityNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
+    def __init__(self, env : Rice, n_features: int, params : dict = None):
         
         super(ActivityNet, self).__init__()
 
         self.state_space = n_features
         self.action_space = env.action_space[0] #? fix that
         self.action_mask_length = np.prod(env.default_agent_action_mask.shape)
-
-        self.device = device
 
         self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -29,21 +27,21 @@ class ActivityNet(ActorCritic):
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh()
-        ).to(self.device)
-
+        )
+        
         self.actor_heads = nn.ModuleList([
             nn.Linear(64, space.n)
             for space in self.action_space
-        ]).to(self.device)
-
+        ])
+        
         self.critic = nn.Sequential(
             nn.Linear(self.state_space + self.action_mask_length, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),
             nn.Linear(64, 1)
-        ).to(self.device)
-
+        )
+        
     def forward(self):
         raise NotImplementedError
     
