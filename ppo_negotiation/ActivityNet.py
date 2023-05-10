@@ -29,11 +29,12 @@ class ActivityNet(ActorCritic):
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh()
-        )
+        ).to(self.device)
+
         self.actor_heads = nn.ModuleList([
             nn.Linear(64, space.n)
             for space in self.action_space
-        ])
+        ]).to(self.device)
 
         self.critic = nn.Sequential(
             nn.Linear(self.state_space + self.action_mask_length, 64),
@@ -41,7 +42,7 @@ class ActivityNet(ActorCritic):
             nn.Linear(64, 64),
             nn.Tanh(),
             nn.Linear(64, 1)
-        )
+        ).to(self.device)
 
     def forward(self):
         raise NotImplementedError

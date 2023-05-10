@@ -26,7 +26,7 @@ class ProposalNet(ActorCritic):
             nn.Tanh(),
             nn.Linear(64, self.action_space),
             nn.Sigmoid()
-        )
+        ).to(self.device)
 
         self.critic = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -34,7 +34,7 @@ class ProposalNet(ActorCritic):
             nn.Linear(64, 64),
             nn.Tanh(),
             nn.Linear(64, 1)
-        )
+        ).to(self.device)
 
     def forward(self, x):
         raise NotImplementedError
