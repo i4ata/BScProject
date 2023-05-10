@@ -9,7 +9,7 @@ import sys
 sys.path.append("..")
 from rice import Rice
 
-from typing import Tuple
+from typing import Tuple, List
 
 class ActivityNet(ActorCritic):
     def __init__(self, env : Rice, n_features: int, params : dict = None, device : str = 'cpu'):
@@ -48,30 +48,20 @@ class ActivityNet(ActorCritic):
     
     def act_deterministically(self, state : torch.Tensor) -> np.ndarray:
         with torch.no_grad():
-            observation, action_mask = state[:, :self.state_space], state[:, self.state_space:].reshape((-1, len(self.actor_heads)))
-            logits = self.actor_layers(observation)
-            action_logits = [torch.subtract(head(logits), 1 - action_mask[:, i], alpha = 1e5) 
-                            for (i, head) in enumerate(self.actor_heads)]
-            action_logits = [head(logits) for head in self.actor_heads]
+            action_logits = self._get_action_logits(state)
         return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
     
     def act_stochastically(self, state : torch.Tensor) -> np.ndarray:
         with torch.no_grad():
-            observation, action_mask = state[:, :self.state_space], state[:, self.state_space:].reshape((-1, len(self.actor_heads)))
-            logits = self.actor_layers(observation)
-            action_logits = [torch.subtract(head(logits), 1 - action_mask[:, i], alpha = 1e5) 
-                            for (i, head) in enumerate(self.actor_heads)]
+            action_logits = self._get_action_logits(state)
             distributions = [Categorical(logits = logits) for logits in action_logits]
         return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
 
     def act(self, state : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         with torch.no_grad():
-            observation = state[:, :self.state_space]
-            action_mask = state[:, self.state_space:].reshape((state.shape[0], len(self.actor_heads), -1))
             
-            logits = self.actor_layers(observation)
-            action_logits = [torch.subtract(head(logits), 1 - action_mask[:, i], alpha = 1e5) 
-                            for (i, head) in enumerate(self.actor_heads)]
+            action_logits = self._get_action_logits(state)
+            
             distributions = [Categorical(logits = logits) for logits in action_logits]
 
             actions = torch.stack([dist.sample().detach() for dist in distributions])
@@ -80,13 +70,9 @@ class ActivityNet(ActorCritic):
         return actions.T, actions_logprobs.T, state_values
 
     def evaluate(self, state : torch.Tensor, actions : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        #print(state.shape)
-        observation = state[:, :self.state_space]
-        action_mask = state[:, self.state_space:].reshape((state.shape[0], len(self.actor_heads), -1))
         
-        logits = self.actor_layers(observation)
-        action_logits = [torch.subtract(head(logits), 1 - action_mask[:, i], alpha = 1e5) 
-                        for (i, head) in enumerate(self.actor_heads)]
+        action_logits = self._get_action_logits(state)
+        
         distributions = [Categorical(logits = logits) for logits in action_logits]
         
         actions_logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T
@@ -94,6 +80,15 @@ class ActivityNet(ActorCritic):
         state_values = self.critic(state)
         
         return actions_logprobs, state_values, distribution_entropies
+
+    def _get_action_logits(self, state : torch.Tensor) -> List[torch.Tensor]:
+        observation = state[:, :self.state_space]
+        action_mask = state[:, self.state_space:].reshape((state.shape[0], len(self.actor_heads), -1))
+
+        logits = self.actor_layers(observation)
+        action_logits = [torch.subtract(head(logits), 1 - action_mask[:, i], alpha = 1e5)
+                         for (i, head) in enumerate(self.actor_heads)]
+        return action_logits
 
     def get_actor_parameters(self):
         return list(self.actor_layers.parameters()) + list(self.actor_heads.parameters())

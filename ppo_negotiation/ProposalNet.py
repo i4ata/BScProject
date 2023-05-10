@@ -15,9 +15,6 @@ class ProposalNet(ActorCritic):
 
         super(ProposalNet, self).__init__()
 
-        # action space needs to be equal to the number of agents. The output of the model is the probability
-        # of accepting each proposal
-        # state space needs to be the number of agents * 2 * size of action mask
         self.state_space = n_features
         self.action_space = env.num_agents * env.len_actions
         self.device = device
@@ -43,9 +40,6 @@ class ProposalNet(ActorCritic):
         raise NotImplementedError
     
     def act(self, state : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Pass a state in the correct format! [batch_size, self.state_space]
-        """
         with torch.no_grad():
             probs = self.actor(state)
             state_value = self.critic(state)

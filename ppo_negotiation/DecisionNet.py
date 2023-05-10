@@ -40,9 +40,6 @@ class DecisionNet(ActorCritic):
         raise NotImplementedError
     
     def act(self, state : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Pass a state in the correct format! [batch_size, self.state_space]
-        """
         with torch.no_grad():
             probs = self.actor(state)
             state_value = self.critic(state)
