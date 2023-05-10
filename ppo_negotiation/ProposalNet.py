@@ -17,7 +17,7 @@ class ProposalNet(ActorCritic):
 
         self.state_space = n_features
         self.action_space = env.num_agents * env.len_actions
-        
+
         self.actor = nn.Sequential(
             nn.Linear(self.state_space, 64),
             nn.Tanh(),
@@ -42,7 +42,7 @@ class ProposalNet(ActorCritic):
         with torch.no_grad():
             probs = self.actor(state)
             state_value = self.critic(state)
-            actions = (torch.rand(probs.shape).to(self.device) < probs) * 1
+            actions = (torch.rand(probs.shape).to(probs.device) < probs) * 1
             log_probs = torch.log(torch.abs(actions - probs))
 
         return actions, log_probs, state_value
@@ -64,7 +64,7 @@ class ProposalNet(ActorCritic):
     def act_stochastically(self, state : torch.Tensor) -> np.ndarray:
         with torch.no_grad():
             probs = self.actor(state)
-        return ((torch.rand(probs.shape).to(self.device) < probs) * 1).detach().cpu().numpy()
+        return ((torch.rand(probs.shape).to(probs.device) < probs) * 1).detach().cpu().numpy()
         
     def get_actor_parameters(self):
         return self.actor.parameters()
