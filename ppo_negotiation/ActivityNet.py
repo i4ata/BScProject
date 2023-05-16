@@ -18,7 +18,6 @@ class ActivityNet(ActorCritic):
 
         self.state_space = n_features
         self.action_space = env.action_space[0] #? fix that
-        self.action_mask_length = np.prod(env.default_agent_action_mask.shape)
 
         self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -35,7 +34,7 @@ class ActivityNet(ActorCritic):
         ])
         
         self.critic = nn.Sequential(
-            nn.Linear(self.state_space + self.action_mask_length, 64),
+            nn.Linear(self.state_space + env.len_actions, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),
