@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.distributions import Categorical
 import numpy as np
 
-from PPO_negotiation import ActorCritic
+from Interfaces import ActorCritic
 
 import sys
 sys.path.append("..")

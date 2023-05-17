@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from PPO_negotiation import ActorCritic
+from Interfaces import ActorCritic
 
 import sys
 sys.path.append("..")
@@ -96,6 +96,8 @@ class NegotiationNet(ActorCritic):
         
         state_value = self.critic(state)
         
+        #print(decisions.shape, decision_probs.shape)
+        #print(proposals.shape, proposal_probs.shape)
         decision_log_probs = torch.log(torch.abs(decisions - decision_probs))
         proposal_log_probs = torch.log(torch.abs(proposals - proposal_probs))
         

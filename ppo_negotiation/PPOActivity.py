@@ -1,75 +1,11 @@
 import torch
-import torch.nn as nn
-from torch.distributions import Categorical
+from Interfaces import ActorCritic, PPO
 
-import copy
-
-################################## PPO Policy ##################################
-
-_FEATURES = 'features'
-_ACTION_MASK = 'action_mask'
-
-class RolloutBuffer:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.state_values = []
-        self.is_terminals = []
+class PPOActivity(PPO):
     
-    def clear(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.state_values[:]
-        del self.is_terminals[:]
+    def __init__(self, model: ActorCritic, params: dict, device: str):
+        super().__init__(model, params, device)
 
-
-class ActorCritic(nn.Module):
-    def __init__(self):
-        super(ActorCritic, self).__init__()
-        pass
-        
-    def forward(self):
-        raise NotImplementedError
-    
-    def act_deterministically(self, state):
-        pass
-    
-    def act_stochastically(self, state):
-        pass
-
-    def act(self, state, mask):
-        pass
-
-    def evaluate(self, state, actions):
-        pass
-
-    def get_actor_parameters(self):
-        pass
-
-class PPO:
-    def __init__(self, model : ActorCritic, params : dict, device : str):
-
-        self.params = params
-        self.device = device
-
-        self.buffer = RolloutBuffer()
-
-        self.policy = model.to(device)
-        
-        self.optimizer = torch.optim.Adam([
-                        {'params': self.policy.get_actor_parameters(), 'lr': .001},
-                        {'params': self.policy.critic.parameters(), 'lr': .001}
-                    ])
-
-        self.policy_old = copy.deepcopy(self.policy)
-        
-        self.MseLoss = nn.MSELoss()
-
-        self.loss_collection = []
 
     def select_action(self, states):
         """
@@ -84,8 +20,7 @@ class PPO:
         self.buffer.state_values.extend(state_val)
 
         return [action.cpu().numpy() for action in actions]
-        #return actions.cpu().numpy()
-    
+        
     def update(self):
         """
         Update the policy with PPO
@@ -143,10 +78,3 @@ class PPO:
 
         # clear buffer
         self.buffer.clear()
-    
-    def save(self, checkpoint_path):
-        torch.save(self.policy_old.state_dict(), checkpoint_path)
-   
-    def load(self, checkpoint_path):
-        self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
-        self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))

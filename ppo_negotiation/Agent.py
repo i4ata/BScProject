@@ -1,9 +1,12 @@
-from PPO_negotiation import PPO
+from PPOActivity import PPOActivity
+from PPONegotiation import PPONegotiation
 from ActivityNet import ActivityNet
 from NegotiationNet import NegotiationNet
 
 import torch
 import numpy as np
+
+from typing import Dict, List
 
 import sys
 sys.path.append("..")
@@ -12,33 +15,36 @@ from rice import Rice
 class Agent():
     def __init__(self, env : Rice, intial_state : dict, id : int, device : str = 'cpu'):
         self.nets = {
-            'activityNet' : PPO(model = ActivityNet(env, len(intial_state['features'])), params = None, device = device),
-            'negotiationNet' : PPO(model = NegotiationNet(env, len(intial_state['features'])), params = None, device = device)
+            'activityNet' : PPOActivity(model = ActivityNet(env, len(intial_state['features'])), params = None, device = device),
+            'negotiationNet' : PPONegotiation(model = NegotiationNet(env, len(intial_state['features'])), params = None, device = device)
         }
 
         self.device = device
         self.id = id
 
-    # The functions below currently work for 1 state only (not with a batch of states)
-    # Later remove the unsqueeze
-
-    def act(self, state : dict):
-        features = torch.FloatTensor(state['features'])
-        action_mask = torch.FloatTensor(state['action_mask'].flatten())
-        return self.nets['activityNet'].select_action(torch.cat((features, action_mask)).to(self.device).unsqueeze(0))
+    def act(self, states : List[Dict[str, np.ndarray]]) -> List[np.ndarray]:
+        features = torch.FloatTensor(np.array([state['features'] for state in states]))
+        action_mask = torch.FloatTensor(np.array([state['action_mask'].flatten() for state in states]))
+        
+        return self.nets['activityNet'].select_action(torch.cat((features, action_mask), dim = 1).to(self.device))
     
-    def negotiate(self, state : dict):
-        features = torch.FloatTensor(state['features'])
-        promises = torch.FloatTensor(
+    def negotiate(self, states : List[Dict[str, np.ndarray]]) -> List[np.ndarray]:
+        features = torch.FloatTensor(np.array([state['features'] for state in states]))
+        
+        promises = torch.FloatTensor(np.array([
             np.array(list(state['promises'].values())).flatten()
-        )
-        proposals = torch.FloatTensor(
+            for state in states
+        ]))
+        
+        proposals = torch.FloatTensor(np.array([
             np.array(list(state['proposals'].values())).flatten()
-        )
-        return self.nets['negotiationNet'].select_action(torch.cat((features, promises, proposals)).to(self.device).unsqueeze(0))
+            for state in states
+        ]))
+        
+        return self.nets['negotiationNet'].select_action(torch.cat((features, promises, proposals), dim = 1).to(self.device))
     
     #
 
-    def update(self):
+    def update(self) -> None:
         for net in self.nets:
             self.nets[net].update()
