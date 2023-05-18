@@ -389,6 +389,7 @@ class Rice:
     def rollback(self, n = 1):
         assert self.timestep >= n
         self.timestep -= n
+        self.activity_timestep -= n
         return self.generate_observation()
 
     def update_mask(self, region_id : int, decisions : np.ndarray):

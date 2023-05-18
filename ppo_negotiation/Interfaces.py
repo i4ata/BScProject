@@ -77,7 +77,7 @@ class PPO:
 
         self.loss_collection = []
 
-    def select_action(self, states: torch.Tensor) -> List[np.ndarray]:
+    def select_action(self, states: torch.Tensor, save = True) -> List[np.ndarray]:
         pass
     
     def update(self):

@@ -22,11 +22,18 @@ class Agent():
         self.device = device
         self.id = id
 
-    def act(self, states : List[Dict[str, np.ndarray]]) -> List[np.ndarray]:
+    def act(self, states : List[Dict[str, np.ndarray]], with_mask = True) -> List[np.ndarray]:
         features = torch.FloatTensor(np.array([state['features'] for state in states]))
+        
         action_mask = torch.FloatTensor(np.array([state['action_mask'].flatten() for state in states]))
         
-        return self.nets['activityNet'].select_action(torch.cat((features, action_mask), dim = 1).to(self.device))
+        if not with_mask:
+            action_mask = torch.ones_like(action_mask)
+
+        return self.nets['activityNet'].select_action(
+            torch.cat((features, action_mask), dim = 1).to(self.device), 
+            save = with_mask
+        )
     
     def negotiate(self, states : List[Dict[str, np.ndarray]]) -> List[np.ndarray]:
         features = torch.FloatTensor(np.array([state['features'] for state in states]))

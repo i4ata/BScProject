@@ -7,20 +7,24 @@ class PPOActivity(PPO):
         super().__init__(model, params, device)
 
 
-    def select_action(self, states):
+    def select_action(self, states, save = True):
         """
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
             
         actions, actions_logprobs, state_val = self.policy_old.act(states)
+        actions_numpy = [action.cpu().numpy() for action in actions]
+
+        if not save:
+            return actions_numpy
 
         self.buffer.states.extend(states)
         self.buffer.actions.extend(actions)
         self.buffer.logprobs.extend(actions_logprobs)
         self.buffer.state_values.extend(state_val)
 
-        return [action.cpu().numpy() for action in actions]
-        
+        return actions_numpy
+    
     def update(self):
         """
         Update the policy with PPO

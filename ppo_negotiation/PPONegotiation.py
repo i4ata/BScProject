@@ -10,12 +10,20 @@ class PPONegotiation(PPO):
         super().__init__(model, params, device)
     
 
-    def select_action(self, states):
+    def select_action(self, states, save = True):
         """
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
 
         actions, state_val = self.policy_old.act(states)
+
+        return_dict = {
+            'decisions' : [decision.cpu().numpy() for decision in actions['decisions']['decisions']],
+            'proposals' : [proposal.cpu().numpy() for proposal in actions['proposals']['proposals']]
+        }
+
+        if not save:
+            return return_dict
 
         self.buffer.states.extend(states)
         self.buffer.state_values.extend(state_val)
@@ -25,11 +33,6 @@ class PPONegotiation(PPO):
 
         self.buffer.proposals.extend(actions['proposals']['proposals'])
         self.buffer.proposals_logprobs.extend(actions['proposals']['log_probs'])
-
-        return_dict = {
-            'decisions' : [decision.cpu().numpy() for decision in actions['decisions']['decisions']],
-            'proposals' : [proposal.cpu().numpy() for proposal in actions['proposals']['proposals']]
-        }
 
         return return_dict
     
@@ -92,7 +95,7 @@ class PPONegotiation(PPO):
             loss = -torch.min(surr1_proposals, surr2_proposals) - \
                     torch.min(surr1_decisions, surr2_decisions) + \
                     .5 * self.MseLoss(state_values, returns) - \
-                    .01 * actions['decisions']['entropies'] -\
+                    .01 * actions['decisions']['entropies'] - \
                     .01 * actions['decisions']['entropies']
             # take gradient step
             self.optimizer.zero_grad()
