@@ -163,14 +163,27 @@ class Rice:
         }
         
         self.promises = {
-            region_id : np.copy(self.default_agent_action_mask)
-            for region_id in range(self.num_regions)
+            sender : {
+                receiver : np.copy(self.default_agent_action_mask) 
+                for receiver in range(self.num_regions) 
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
         }
 
         self.proposals = {
             sender : {
                 receiver : np.copy(self.default_agent_action_mask) 
                 for receiver in range(self.num_regions) 
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+
+        self.decisions = {
+            sender : {
+                receiver : 0
+                for receiver in range(self.num_regions)
                 if receiver != sender
             }
             for sender in range(self.num_regions)

@@ -13,6 +13,9 @@ class RolloutBuffer:
         self.proposals = []
         self.proposals_logprobs = []
 
+        self.promises = []
+        self.promises_logprobs = []
+
         self.actions = []
         self.logprobs = []
 
@@ -26,6 +29,8 @@ class RolloutBuffer:
         del self.decisions_logprobs[:]
         del self.proposals[:]
         del self.proposals_logprobs[:]
+        del self.promises[:]
+        del self.promises_logprobs[:]
         del self.actions[:]
         del self.states[:]
         del self.logprobs[:]
