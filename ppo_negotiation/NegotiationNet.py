@@ -16,7 +16,7 @@ class NegotiationNet(ActorCritic):
 
         super(NegotiationNet, self).__init__()
 
-        self.state_space = n_features + (2 * env.num_agents - 1) * env.len_actions
+        self.state_space = n_features + 2 * (env.num_agents - 1) * env.len_actions
         
         self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -37,7 +37,7 @@ class NegotiationNet(ActorCritic):
                     nn.Linear(64, env.len_actions),
                     nn.Sigmoid()
                 ),
-                'promises' : nn.Sequential(
+                'promise' : nn.Sequential(
                     nn.Linear(64, env.len_actions),
                     nn.Sigmoid()
                 )
@@ -53,22 +53,26 @@ class NegotiationNet(ActorCritic):
             nn.Linear(64, 1)
         )
 
-    def act(self, 
-            state : torch.Tensor) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
+    def act(self, env_state : torch.Tensor, **kwargs) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
         
         with torch.no_grad():
+
+            proposals_state = kwargs['proposals']
+            promises_state = kwargs['promises']
+
+            negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
+
+            decision_probs, proposal_probs, promise_probs = self._get_probs(negotiation_state)
             
-            decision_probs, proposal_probs, promise_probs = self._get_probs(state)
-            
-            state_value = self.critic(state)
+            state_value = self.critic(negotiation_state)
 
             decisions = (torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1
             proposals = (torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1
-            promise = (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
+            promises = (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
 
             log_probs_decisions = torch.log(torch.abs(decisions - decision_probs))
             log_probs_proposals = torch.log(torch.abs(proposals - proposal_probs))
-            log_probs_promise = torch.log(torch.abs(promise - promise_probs))
+            log_probs_promise = torch.log(torch.abs(promises - promise_probs))
             
             return_dict = {
                 'decisions' : {
@@ -80,23 +84,27 @@ class NegotiationNet(ActorCritic):
                     'log_probs' : log_probs_proposals
                 },
                 'promises' : {
-                    'promises' : promise,
+                    'promises' : promises,
                     'log_probs' : log_probs_promise
                 }
             }
 
         return return_dict, state_value
 
-    def evaluate(self, 
-                 state: torch.Tensor, 
-                 decisions: torch.Tensor, 
-                 proposals: torch.Tensor,
-                 promises: torch.Tensor) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
+    def evaluate(self, env_state: torch.Tensor, **kwargs) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
         
-        
-        decision_probs, proposal_probs, promise_probs = self._get_probs(state)
+        decisions = kwargs['actions']['decisions']
+        proposals = kwargs['actions']['proposals']
+        promises = kwargs['actions']['promises']
 
-        state_value = self.critic(state)
+        proposals_state = kwargs['states']['proposals']
+        promises_state = kwargs['states']['promises']
+
+        negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
+
+        decision_probs, proposal_probs, promise_probs = self._get_probs(negotiation_state)
+
+        state_value = self.critic(negotiation_state)
 
         decision_log_probs = torch.log(torch.abs(decisions - decision_probs))
         proposal_log_probs = torch.log(torch.abs(proposals - proposal_probs))
@@ -130,12 +138,12 @@ class NegotiationNet(ActorCritic):
 
             decisions = ((decision_probs > .5) * 1).detach().cpu().numpy()
             proposals = ((proposal_probs > .5) * 1).detach().cpu().numpy()
-            promise = ((promise_probs > .5) * 1).detach().cpu().numpy()
+            promises = ((promise_probs > .5) * 1).detach().cpu().numpy()
 
             return_dict = {
                 'decisions': decisions,
                 'proposals': proposals,
-                'promise': promise
+                'promise': promises
             }
         return return_dict
     
@@ -146,12 +154,12 @@ class NegotiationNet(ActorCritic):
 
             decisions = ((torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1).detach().cpu().numpy()
             proposals = ((torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1).detach().cpu().numpy()
-            promise = ((torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1).detach().cpu().numpy()
+            promises = ((torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1).detach().cpu().numpy()
 
             return_dict = {
                 'decisions': decisions,
                 'proposals': proposals,
-                'promise': promise
+                'promise': promises
             }
         return return_dict
 
@@ -161,8 +169,8 @@ class NegotiationNet(ActorCritic):
     def _get_probs(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         logits = self.actor_layers(state)
         decision_probs, proposal_probs, promise_probs = zip(
-            *[(head['decision'](logits), head['proposal'](logits), head['decision'](logits)) 
-                for head in self.actor_heads]
+            *[(head['decision'](logits), head['proposal'](logits), head['promise'](logits)) 
+            for head in self.actor_heads]
         )
 
         decision_probs = torch.stack(decision_probs, dim = 1)

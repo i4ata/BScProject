@@ -405,22 +405,48 @@ class Rice:
         self.activity_timestep -= n
         return self.generate_observation()
 
-    def update_mask(self, region_id : int, decisions : np.ndarray):
-        proposals = [self.proposals[sender][region_id] for sender in range(self.num_agents) if sender != region_id]
+    def register_negotiation(self, agent_id: int, actions_dict: dict, proposals: bool):
         
-        self.agent_action_masks[region_id] = np.logical_and.reduce(
-            [
-                accepted_proposal
-                for (i, accepted_proposal) in enumerate(proposals) 
-                if decisions[i]
-            ] + [self.promises[region_id]]
-        )
+        nego_id = 0
+        for other_agent_id in range(self.num_agents):
+            if other_agent_id == agent_id:
+                continue
 
-    def make_proposals(self, sender_id : int, actions : np.ndarray):
-        actions = actions.reshape(([-1] + list(self.default_agent_action_mask.shape)))
-        self.promises[sender_id] = actions[0]
-        for (i, receiver_id) in enumerate(self.proposals[sender_id]):
-            self.proposals[sender_id][receiver_id] = actions[i + 1]
+            if proposals:
+                self.proposals[agent_id][other_agent_id] = actions_dict['proposals'][nego_id]
+                self.promises[agent_id][other_agent_id] = actions_dict['promises'][nego_id]
+            else:
+                self.decisions[agent_id][other_agent_id] = actions_dict['decisions'][nego_id]
+            
+            nego_id += 1
+            
+    def register_collective_negotiation(self, actions: dict, proposals):
+        for agent_id in actions:
+            self.register_negotiation(agent_id, actions[agent_id], proposals)
+
+    def register_proposals(self, actions: dict):
+        self.register_collective_negotiation(actions, proposals=True)
+
+    def register_decisions(self, actions):
+        self.register_collective_negotiation(actions, proposals=False)
+        
+    def update_mask(self, agent_id : int):
+
+        accepted_proposals = [np.array(self.proposals[other_agent_id][agent_id])
+                              for other_agent_id in range(self.num_agents)
+                              if agent_id != other_agent_id and self.decisions[agent_id][other_agent_id]]
+            
+        accepted_promises = [np.array(self.promises[agent_id][other_agent_id])
+                             for other_agent_id in range(self.num_agents)
+                             if agent_id != other_agent_id and self.decisions[other_agent_id][agent_id]]
+
+        self.agent_action_masks[agent_id] = np.logical_and.reduce(
+            accepted_promises + accepted_proposals + [self.default_agent_action_mask.flatten()]
+        ).reshape(11, 10)
+
+    def update_masks(self):
+        for agent_id in range(self.num_agents):
+            self.update_mask(agent_id)
 
     def generate_observation(self):
         """
@@ -466,7 +492,11 @@ class Rice:
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
                 _ACTION_MASK: self.agent_action_masks[region_id],
-                _PROMISES: self.promises,
+                _PROMISES: {
+                    sender_id: self.promises[sender_id][region_id]
+                    for sender_id in range(self.num_agents)
+                    if sender_id != region_id
+                },
                 _PROPOSALS: {
                     sender_id: self.proposals[sender_id][region_id]
                     for sender_id in range(self.num_agents)

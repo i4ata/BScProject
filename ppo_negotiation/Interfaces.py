@@ -19,10 +19,15 @@ class RolloutBuffer:
         self.actions = []
         self.logprobs = []
 
-        self.states = []
+        self.action_masks = []
+
+        self.env_states = []
         self.rewards = []
         self.state_values = []
         self.is_terminals = []
+
+        self.proposals_states = []
+        self.promises_states = []
     
     def clear(self):
         del self.decisions[:]
@@ -32,11 +37,15 @@ class RolloutBuffer:
         del self.promises[:]
         del self.promises_logprobs[:]
         del self.actions[:]
-        del self.states[:]
         del self.logprobs[:]
+        del self.action_masks[:]
+        del self.env_states[:]
         del self.rewards[:]
         del self.state_values[:]
         del self.is_terminals[:]
+
+        del self.proposals_states[:]
+        del self.promises_states[:]
 
 class ActorCritic(nn.Module):
     def __init__(self):
@@ -52,10 +61,10 @@ class ActorCritic(nn.Module):
     def act_stochastically(self, state):
         pass
 
-    def act(self, state, mask):
+    def act(self, env_state, **kwargs):
         pass
 
-    def evaluate(self, state, actions):
+    def evaluate(self, env_state, **kwargs):
         pass
 
     def get_actor_parameters(self):
@@ -82,7 +91,7 @@ class PPO:
 
         self.loss_collection = []
 
-    def select_action(self, states: torch.Tensor, save = True) -> List[np.ndarray]:
+    def select_action(self, env_state, **kwargs) -> List[np.ndarray]:
         pass
     
     def update(self):

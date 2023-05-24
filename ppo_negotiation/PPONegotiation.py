@@ -11,33 +11,39 @@ class PPONegotiation(PPO):
         super().__init__(model, params, device)
     
 
-    def select_action(self, states, save = True) -> Dict[str, List[np.ndarray]]:
+    def select_action(self, env_state, **kwargs) -> Dict[str, List[np.ndarray]]:
         """
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
 
-        actions, state_val = self.policy_old.act(states)
+        actions, state_val = self.policy_old.act(env_state, **kwargs)
 
         return_dict = {
             'decisions' : [decision.cpu().numpy() for decision in actions['decisions']['decisions']],
             'proposals' : [proposal.cpu().numpy() for proposal in actions['proposals']['proposals']],
-            'promise' : [promise.cpu().numpy() for promise in actions['promises']['promises']]
+            'promises' : [promise.cpu().numpy() for promise in actions['promises']['promises']]
         }
 
-        if not save:
-            return return_dict
+        if kwargs['save_state']:
 
-        self.buffer.states.extend(states)
-        self.buffer.state_values.extend(state_val)
+            self.buffer.env_states.extend(env_state)
+            self.buffer.state_values.extend(state_val)
+            self.buffer.proposals_states.extend(kwargs['proposals'])
+            self.buffer.promises_states.extend(kwargs['promises'])
 
-        self.buffer.decisions.extend(actions['decisions']['decisions'])
-        self.buffer.decisions_logprobs.extend(actions['decisions']['log_probs'])
+        if kwargs['save_decisions']:
 
-        self.buffer.proposals.extend(actions['proposals']['proposals'])
-        self.buffer.proposals_logprobs.extend(actions['proposals']['log_probs'])
+            self.buffer.decisions.extend(actions['decisions']['decisions'])
+            self.buffer.decisions_logprobs.extend(actions['decisions']['log_probs'])
 
-        self.buffer.promises.extend(actions['promises']['promises'])
-        self.buffer.promises_logprobs.extend(actions['promises']['log_probs'])
+        if kwargs['save_proposals_promises']:
+
+            self.buffer.proposals.extend(actions['proposals']['proposals'])
+            self.buffer.proposals_logprobs.extend(actions['proposals']['log_probs'])
+
+            self.buffer.promises.extend(actions['promises']['promises'])
+            self.buffer.promises_logprobs.extend(actions['promises']['log_probs'])
+
 
         return return_dict
     
@@ -59,7 +65,7 @@ class PPONegotiation(PPO):
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
         # convert list to tensor
-        old_states = torch.squeeze(torch.stack(self.buffer.states, dim=0)).detach()
+        old_states = torch.squeeze(torch.stack(self.buffer.env_states, dim=0)).detach()
         old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
         old_decisions = torch.squeeze(torch.stack(self.buffer.decisions, dim = 0)).detach()
         old_decisions_logprobs = torch.squeeze(torch.stack(self.buffer.decisions_logprobs, dim = 0)).detach()
@@ -67,7 +73,9 @@ class PPONegotiation(PPO):
         old_proposals_logprobs = torch.squeeze(torch.stack(self.buffer.proposals_logprobs, dim = 0)).detach()
         old_promises = torch.squeeze(torch.stack(self.buffer.promises, dim = 0)).detach()
         old_promises_logprobs = torch.squeeze(torch.stack(self.buffer.promises_logprobs, dim = 0)).detach()
-        
+
+        old_proposals_states = torch.squeeze(torch.stack(self.buffer.proposals_states, dim = 0)).detach()
+        old_promises_states = torch.squeeze(torch.stack(self.buffer.promises_states, dim = 0)).detach()
 
         # calculate advantages
         # it's necessary to make the advantages 3-dimensional since the decisions and proposals are also 3 dimensional:
@@ -81,9 +89,16 @@ class PPONegotiation(PPO):
             # Evaluating old actions and values
             actions, state_values = self.policy.evaluate(
                 old_states, 
-                old_decisions.unsqueeze(-1), 
-                old_proposals,
-                old_promises) # look at the unsqueeze
+                actions = {
+                    'decisions': old_decisions.unsqueeze(-1),
+                    'proposals': old_proposals,
+                    'promises': old_promises
+                },
+                states = {
+                    'proposals': old_proposals_states,
+                    'promises': old_promises_states
+                }
+            ) # look at the unsqueeze
             
             # match state_values tensor dimensions with rewards tensor
             state_values = torch.squeeze(state_values)

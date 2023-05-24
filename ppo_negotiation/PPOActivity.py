@@ -7,18 +7,19 @@ class PPOActivity(PPO):
         super().__init__(model, params, device)
 
 
-    def select_action(self, states, save = True):
+    def select_action(self, env_state, **kwargs):
         """
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
             
-        actions, actions_logprobs, state_val = self.policy_old.act(states)
+        actions, actions_logprobs, state_val = self.policy_old.act(env_state, action_mask=kwargs['action_mask'])
         actions_numpy = [action.cpu().numpy() for action in actions]
 
-        if not save:
+        if not kwargs['save']:
             return actions_numpy
 
-        self.buffer.states.extend(states)
+        self.buffer.env_states.extend(env_state)
+        self.buffer.action_masks.extend(kwargs['action_mask'])
         self.buffer.actions.extend(actions)
         self.buffer.logprobs.extend(actions_logprobs)
         self.buffer.state_values.extend(state_val)
@@ -43,10 +44,11 @@ class PPOActivity(PPO):
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
         # convert list to tensor
-        old_states = torch.squeeze(torch.stack(self.buffer.states, dim=0)).detach()
+        old_states = torch.squeeze(torch.stack(self.buffer.env_states, dim=0)).detach()
         old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach()
         old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach()
         old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
+        old_action_masks = torch.squeeze(torch.stack(self.buffer.action_masks, dim = 0)).detach()
 
         # calculate advantages
         advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
@@ -55,7 +57,9 @@ class PPOActivity(PPO):
         for _ in range(10):
             
             # Evaluating old actions and values
-            logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
+            logprobs, state_values, dist_entropy = self.policy.evaluate(env_state=old_states, 
+                                                                        actions=old_actions, 
+                                                                        action_mask=old_action_masks)
             
             # match state_values tensor dimensions with rewards tensor
             state_values = torch.squeeze(state_values)
