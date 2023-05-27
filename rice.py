@@ -442,7 +442,7 @@ class Rice:
 
         self.agent_action_masks[agent_id] = np.logical_and.reduce(
             accepted_promises + accepted_proposals + [self.default_agent_action_mask.flatten()]
-        ).reshape(11, 10)
+        ).reshape(-1, self.num_discrete_action_levels)
 
     def update_masks(self):
         for agent_id in range(self.num_agents):
