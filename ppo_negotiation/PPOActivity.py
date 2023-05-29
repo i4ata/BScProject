@@ -18,11 +18,11 @@ class PPOActivity(PPO):
         if not kwargs['save']:
             return actions_numpy
 
-        self.buffer.env_states.extend(env_state)
-        self.buffer.action_masks.extend(kwargs['action_mask'])
-        self.buffer.actions.extend(actions)
-        self.buffer.logprobs.extend(actions_logprobs)
-        self.buffer.state_values.extend(state_val)
+        self.buffer.    env_states.     extend(env_state)
+        self.buffer.    action_masks.   extend(kwargs['action_mask'])
+        self.buffer.    actions.        extend(actions)
+        self.buffer.    logprobs.       extend(actions_logprobs)
+        self.buffer.    state_values.   extend(state_val)
 
         return actions_numpy
     
@@ -44,14 +44,14 @@ class PPOActivity(PPO):
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
         # convert list to tensor
-        old_states = torch.squeeze(torch.stack(self.buffer.env_states, dim=0)).detach()
-        old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach()
-        old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach()
-        old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
-        old_action_masks = torch.squeeze(torch.stack(self.buffer.action_masks, dim = 0)).detach()
+        old_states          = torch.stack(self.buffer.env_states, dim=0).detach()
+        old_actions         = torch.stack(self.buffer.actions, dim=0).detach()
+        old_logprobs        = torch.stack(self.buffer.logprobs, dim=0).detach()
+        old_state_values    = torch.stack(self.buffer.state_values, dim=0).detach()
+        old_action_masks    = torch.stack(self.buffer.action_masks, dim = 0).detach()
 
         # calculate advantages
-        advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1)
+        advantages = (returns.detach() - old_state_values.squeeze().detach()).unsqueeze(-1)
 
         # Optimize policy for K epochs
         for _ in range(10):

@@ -26,23 +26,23 @@ class PPONegotiation(PPO):
 
         if kwargs['save_state']:
 
-            self.buffer.env_states.extend(env_state)
-            self.buffer.state_values.extend(state_val)
-            self.buffer.proposals_states.extend(kwargs['proposals'])
-            self.buffer.promises_states.extend(kwargs['promises'])
+            self.buffer.    env_states.         extend(env_state)
+            self.buffer.    state_values.       extend(state_val)
+            self.buffer.    proposals_states.   extend(kwargs['proposals'])
+            self.buffer.    promises_states.    extend(kwargs['promises'])
 
         if kwargs['save_decisions']:
 
-            self.buffer.decisions.extend(actions['decisions']['decisions'])
-            self.buffer.decisions_logprobs.extend(actions['decisions']['log_probs'])
+            self.buffer.    decisions.          extend(actions['decisions']['decisions'])
+            self.buffer.    decisions_logprobs. extend(actions['decisions']['log_probs'])
 
         if kwargs['save_proposals_promises']:
 
-            self.buffer.proposals.extend(actions['proposals']['proposals'])
-            self.buffer.proposals_logprobs.extend(actions['proposals']['log_probs'])
+            self.buffer.    proposals.          extend(actions['proposals']['proposals'])
+            self.buffer.    proposals_logprobs. extend(actions['proposals']['log_probs'])
 
-            self.buffer.promises.extend(actions['promises']['promises'])
-            self.buffer.promises_logprobs.extend(actions['promises']['log_probs'])
+            self.buffer.    promises.           extend(actions['promises']['promises'])
+            self.buffer.    promises_logprobs.  extend(actions['promises']['log_probs'])
 
 
         return return_dict
@@ -63,34 +63,30 @@ class PPONegotiation(PPO):
         # Normalizing the rewards
         returns = torch.tensor(returns, dtype=torch.float32).to(self.device)
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
-
         # convert list to tensor
-        old_states = torch.squeeze(torch.stack(self.buffer.env_states, dim=0)).detach()
-        old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach()
-        old_decisions = torch.squeeze(torch.stack(self.buffer.decisions, dim = 0)).detach()
-        old_decisions_logprobs = torch.squeeze(torch.stack(self.buffer.decisions_logprobs, dim = 0)).detach()
-        old_proposals = torch.squeeze(torch.stack(self.buffer.proposals, dim = 0)).detach()
-        old_proposals_logprobs = torch.squeeze(torch.stack(self.buffer.proposals_logprobs, dim = 0)).detach()
-        old_promises = torch.squeeze(torch.stack(self.buffer.promises, dim = 0)).detach()
-        old_promises_logprobs = torch.squeeze(torch.stack(self.buffer.promises_logprobs, dim = 0)).detach()
-
-        old_proposals_states = torch.squeeze(torch.stack(self.buffer.proposals_states, dim = 0)).detach()
-        old_promises_states = torch.squeeze(torch.stack(self.buffer.promises_states, dim = 0)).detach()
-
+        old_states              = torch.stack(self.buffer.env_states, dim=0).detach()
+        old_state_values        = torch.stack(self.buffer.state_values, dim=0).detach()
+        old_decisions           = torch.stack(self.buffer.decisions, dim = 0).detach()
+        old_decisions_logprobs  = torch.stack(self.buffer.decisions_logprobs, dim = 0).detach()
+        old_proposals           = torch.stack(self.buffer.proposals, dim = 0).detach()
+        old_proposals_logprobs  = torch.stack(self.buffer.proposals_logprobs, dim = 0).detach()
+        old_promises            = torch.stack(self.buffer.promises, dim = 0).detach()
+        old_promises_logprobs   = torch.stack(self.buffer.promises_logprobs, dim = 0).detach()
+        old_proposals_states    = torch.stack(self.buffer.proposals_states, dim = 0).detach()
+        old_promises_states     = torch.stack(self.buffer.promises_states, dim = 0).detach()
         # calculate advantages
         # it's necessary to make the advantages 3-dimensional since the decisions and proposals are also 3 dimensional:
         # [batch_size x num_agents x decision / proposal]
         # Since there is one decision per agent (0 or 1), that 3rd dimension is gone from the squeezing so I unsqueeze manually later
-        advantages = (returns.detach() - old_state_values.detach()).unsqueeze(1).unsqueeze(1)
+        advantages = (returns.detach() - old_state_values.squeeze().detach()).unsqueeze(-1)
 
         # Optimize policy for K epochs
         for _ in range(10):
-            
             # Evaluating old actions and values
             actions, state_values = self.policy.evaluate(
                 old_states, 
                 actions = {
-                    'decisions': old_decisions.unsqueeze(-1),
+                    'decisions': old_decisions,
                     'proposals': old_proposals,
                     'promises': old_promises
                 },
@@ -99,15 +95,12 @@ class PPONegotiation(PPO):
                     'promises': old_promises_states
                 }
             ) # look at the unsqueeze
-            
             # match state_values tensor dimensions with rewards tensor
             state_values = torch.squeeze(state_values)
-            
             # Finding the ratio (pi_theta / pi_theta__old)
-            ratios_decisions = torch.exp(actions['decisions']['log_probs'] - old_decisions_logprobs.unsqueeze(-1).detach()) # look at the unsqueeze
+            ratios_decisions = torch.exp(actions['decisions']['log_probs'] - old_decisions_logprobs.detach())
             ratios_proposals = torch.exp(actions['proposals']['log_probs'] - old_proposals_logprobs.detach())
             ratios_promises = torch.exp(actions['promises']['log_probs'] - old_promises_logprobs.detach())
-            
             
             # Finding Surrogate Loss
             surr1_decisions = ratios_decisions * advantages
@@ -118,8 +111,7 @@ class PPONegotiation(PPO):
 
             surr1_promises = ratios_promises * advantages
             surr2_promises = torch.clamp(ratios_promises, .8, 1.2) * advantages
-
-
+        
             # final loss of clipped objective PPO
             loss = -torch.min(surr1_proposals, surr2_proposals) - \
                     torch.min(surr1_decisions, surr2_decisions) - \
