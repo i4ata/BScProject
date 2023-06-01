@@ -54,16 +54,48 @@ class Agent():
         
         # tensor_state = torch.cat((features, promises, proposals), dim = 1).to(self.device)
 
-        actions = self.nets['negotiationNet'].select_action(env_state = features, 
-                                                            promises = promises, 
-                                                            proposals = proposals,
-                                                            save_state = save_map['save_state'],
-                                                            save_decisions = save_map['save_decisions'],
-                                                            save_proposals_promises = save_map['save_proposals_promises']
-                                                            )
+        actions = self.nets['negotiationNet'].select_action(
+            env_state = features, 
+            promises = promises, 
+            proposals = proposals,
+            save_state = save_map['save_state'],
+            save_decisions = save_map['save_decisions'],
+            save_proposals_promises = save_map['save_proposals_promises']
+        )
 
         return actions
 
     def update(self) -> None:
         for net in self.nets:
             self.nets[net].update()
+
+    def eval_negotiate(self, state: Dict[str, np.ndarray], deterministic = True) -> Dict[str, np.ndarray]:
+        features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
+        promises = torch.FloatTensor(np.array(list(state['promises'].values())).flatten()).unsqueeze(0).to(self.device)
+        proposals = torch.FloatTensor(np.array(list(state['proposals'].values())).flatten()).unsqueeze(0).to(self.device)
+
+        actions = self.nets['negotiationNet'].policy.act_deterministically(
+            env_state = features,
+            promises = promises,
+            proposals = proposals
+        ) if deterministic else self.nets['negotiationNet'].policy.act_stochastically(
+            env_state = features,
+            promises = promises,
+            proposals = proposals
+        )
+
+        return actions
+    
+    def eval_act(self, state: Dict[str, np.ndarray], deterministic = True) -> np.ndarray:
+        features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
+        action_mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
+
+        actions = self.nets['activityNet'].policy.act_deterministically(
+            env_state = features,
+            action_mask = action_mask
+        ) if deterministic else self.nets['activityNet'].policy.act_stochastically(
+            env_state = features,
+            action_mask = action_mask
+        )
+
+        return actions

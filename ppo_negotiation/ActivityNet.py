@@ -44,14 +44,16 @@ class ActivityNet(ActorCritic):
     def forward(self):
         raise NotImplementedError
     
-    def act_deterministically(self, state : torch.Tensor) -> np.ndarray:
+    def act_deterministically(self, env_state : torch.Tensor, **kwargs) -> np.ndarray:
         with torch.no_grad():
-            action_logits = self._get_action_logits(state)
+            action_mask = kwargs['action_mask']
+            action_logits = self._get_action_logits(env_state, action_mask)
         return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
     
-    def act_stochastically(self, state : torch.Tensor) -> np.ndarray:
+    def act_stochastically(self, env_state : torch.Tensor, **kwargs) -> np.ndarray:
         with torch.no_grad():
-            action_logits = self._get_action_logits(state)
+            action_mask = kwargs['action_mask']
+            action_logits = self._get_action_logits(env_state, action_mask)
             distributions = [Categorical(logits = logits) for logits in action_logits]
         return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
 

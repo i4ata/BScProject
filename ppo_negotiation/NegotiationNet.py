@@ -68,11 +68,11 @@ class NegotiationNet(ActorCritic):
 
             decisions = (torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1
             proposals = (torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1
-            promises = (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
+            promises  = (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
 
             log_probs_decisions = torch.log(torch.abs(decisions - decision_probs))
             log_probs_proposals = torch.log(torch.abs(proposals - proposal_probs))
-            log_probs_promise = torch.log(torch.abs(promises - promise_probs))
+            log_probs_promise   = torch.log(torch.abs(promises  - promise_probs))
             
             return_dict = {
                 'decisions' : {
@@ -131,14 +131,19 @@ class NegotiationNet(ActorCritic):
 
         return return_dict, state_value
     
-    def act_deterministically(self, state: torch.Tensor) -> Dict[str, np.ndarray]:
+    def act_deterministically(self, env_state: torch.Tensor, **kwargs) -> Dict[str, np.ndarray]:
         with torch.no_grad():
             
-            decision_probs, proposal_probs, promise_probs = self._get_probs(state)
+            proposals_state = kwargs['proposals']
+            promises_state = kwargs['promises']
 
-            decisions = ((decision_probs > .5) * 1).detach().cpu().numpy()
-            proposals = ((proposal_probs > .5) * 1).detach().cpu().numpy()
-            promises = ((promise_probs > .5) * 1).detach().cpu().numpy()
+            negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
+
+            decision_probs, proposal_probs, promise_probs = self._get_probs(negotiation_state)
+            
+            decisions = ((decision_probs > .5) * 1) .detach().cpu().numpy()
+            proposals = ((proposal_probs > .5) * 1) .detach().cpu().numpy()
+            promises  = ((promise_probs  > .5) * 1) .detach().cpu().numpy()
 
             return_dict = {
                 'decisions': decisions,
@@ -147,14 +152,25 @@ class NegotiationNet(ActorCritic):
             }
         return return_dict
     
-    def act_stochastically(self, state: torch.Tensor) -> Dict[str, np.ndarray]:
+    def act_stochastically(self, env_state: torch.Tensor, **kwargs) -> Dict[str, np.ndarray]:
         with torch.no_grad():
             
-            decision_probs, proposal_probs, promise_probs = self._get_probs(state)
+            proposals_state = kwargs['proposals']
+            promises_state = kwargs['promises']
 
-            decisions = ((torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1).detach().cpu().numpy()
-            proposals = ((torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1).detach().cpu().numpy()
-            promises = ((torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1).detach().cpu().numpy()
+            negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
+
+            decision_probs, proposal_probs, promise_probs = self._get_probs(negotiation_state)
+            
+            decisions = (
+                (torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1
+            ).detach().cpu().numpy()
+            proposals = (
+                (torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1
+            ).detach().cpu().numpy()
+            promises  = (
+                (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
+            ).detach().cpu().numpy()
 
             return_dict = {
                 'decisions': decisions,
@@ -175,7 +191,7 @@ class NegotiationNet(ActorCritic):
 
         decision_probs = torch.stack(decision_probs, dim = 1)
         proposal_probs = torch.stack(proposal_probs, dim = 1)
-        promise_probs = torch.stack(promise_probs, dim = 1)
+        promise_probs =  torch.stack(promise_probs, dim = 1)
 
 
         return decision_probs, proposal_probs, promise_probs

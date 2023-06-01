@@ -55,10 +55,10 @@ class ActorCritic(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def act_deterministically(self, state):
+    def act_deterministically(self, env_state, **kwargs):
         pass
     
-    def act_stochastically(self, state):
+    def act_stochastically(self, env_state, **kwargs):
         pass
 
     def act(self, env_state, **kwargs):

@@ -21,7 +21,7 @@ class PPONegotiation(PPO):
         return_dict = {
             'decisions' : [decision.cpu().numpy() for decision in actions['decisions']['decisions']],
             'proposals' : [proposal.cpu().numpy() for proposal in actions['proposals']['proposals']],
-            'promises' : [promise.cpu().numpy() for promise in actions['promises']['promises']]
+            'promises' :  [promise. cpu().numpy() for promise  in actions['promises']['promises']]
         }
 
         if kwargs['save_state']:
@@ -51,6 +51,7 @@ class PPONegotiation(PPO):
         """
         Update the policy with PPO
         """
+
         # Monte Carlo estimate of returns
         returns = []
         discounted_return = 0
@@ -63,22 +64,21 @@ class PPONegotiation(PPO):
         # Normalizing the rewards
         returns = torch.tensor(returns, dtype=torch.float32).to(self.device)
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
+
         # convert list to tensor
-        old_states              = torch.stack(self.buffer.env_states, dim=0).detach()
-        old_state_values        = torch.stack(self.buffer.state_values, dim=0).detach()
-        old_decisions           = torch.stack(self.buffer.decisions, dim = 0).detach()
-        old_decisions_logprobs  = torch.stack(self.buffer.decisions_logprobs, dim = 0).detach()
-        old_proposals           = torch.stack(self.buffer.proposals, dim = 0).detach()
-        old_proposals_logprobs  = torch.stack(self.buffer.proposals_logprobs, dim = 0).detach()
-        old_promises            = torch.stack(self.buffer.promises, dim = 0).detach()
-        old_promises_logprobs   = torch.stack(self.buffer.promises_logprobs, dim = 0).detach()
-        old_proposals_states    = torch.stack(self.buffer.proposals_states, dim = 0).detach()
-        old_promises_states     = torch.stack(self.buffer.promises_states, dim = 0).detach()
+        old_states              = torch.stack(self.buffer.env_states, dim=0)            .detach()
+        old_state_values        = torch.stack(self.buffer.state_values, dim=0)          .detach()
+        old_decisions           = torch.stack(self.buffer.decisions, dim = 0)           .detach()
+        old_decisions_logprobs  = torch.stack(self.buffer.decisions_logprobs, dim = 0)  .detach()
+        old_proposals           = torch.stack(self.buffer.proposals, dim = 0)           .detach()
+        old_proposals_logprobs  = torch.stack(self.buffer.proposals_logprobs, dim = 0)  .detach()
+        old_promises            = torch.stack(self.buffer.promises, dim = 0)            .detach()
+        old_promises_logprobs   = torch.stack(self.buffer.promises_logprobs, dim = 0)   .detach()
+        old_proposals_states    = torch.stack(self.buffer.proposals_states, dim = 0)    .detach()
+        old_promises_states     = torch.stack(self.buffer.promises_states, dim = 0)     .detach()
+        
         # calculate advantages
-        # it's necessary to make the advantages 3-dimensional since the decisions and proposals are also 3 dimensional:
-        # [batch_size x num_agents x decision / proposal]
-        # Since there is one decision per agent (0 or 1), that 3rd dimension is gone from the squeezing so I unsqueeze manually later
-        advantages = (returns.detach() - old_state_values.squeeze().detach()).unsqueeze(-1)
+        advantages = (returns.detach() - old_state_values.squeeze().detach()).unsqueeze(-1).unsqueeze(-1)
 
         # Optimize policy for K epochs
         for _ in range(10):
@@ -94,13 +94,13 @@ class PPONegotiation(PPO):
                     'proposals': old_proposals_states,
                     'promises': old_promises_states
                 }
-            ) # look at the unsqueeze
+            )
             # match state_values tensor dimensions with rewards tensor
             state_values = torch.squeeze(state_values)
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios_decisions = torch.exp(actions['decisions']['log_probs'] - old_decisions_logprobs.detach())
             ratios_proposals = torch.exp(actions['proposals']['log_probs'] - old_proposals_logprobs.detach())
-            ratios_promises = torch.exp(actions['promises']['log_probs'] - old_promises_logprobs.detach())
+            ratios_promises =  torch.exp(actions['promises']['log_probs']  - old_promises_logprobs .detach())
             
             # Finding Surrogate Loss
             surr1_decisions = ratios_decisions * advantages
@@ -111,7 +111,7 @@ class PPONegotiation(PPO):
 
             surr1_promises = ratios_promises * advantages
             surr2_promises = torch.clamp(ratios_promises, .8, 1.2) * advantages
-        
+
             # final loss of clipped objective PPO
             loss = -torch.min(surr1_proposals, surr2_proposals) - \
                     torch.min(surr1_decisions, surr2_decisions) - \

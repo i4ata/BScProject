@@ -44,11 +44,11 @@ class PPOActivity(PPO):
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
         # convert list to tensor
-        old_states          = torch.stack(self.buffer.env_states, dim=0).detach()
-        old_actions         = torch.stack(self.buffer.actions, dim=0).detach()
-        old_logprobs        = torch.stack(self.buffer.logprobs, dim=0).detach()
-        old_state_values    = torch.stack(self.buffer.state_values, dim=0).detach()
-        old_action_masks    = torch.stack(self.buffer.action_masks, dim = 0).detach()
+        old_states          = torch.stack(self.buffer.env_states, dim=0)        .detach()
+        old_actions         = torch.stack(self.buffer.actions, dim=0)           .detach()
+        old_logprobs        = torch.stack(self.buffer.logprobs, dim=0)          .detach()
+        old_state_values    = torch.stack(self.buffer.state_values, dim=0)      .detach()
+        old_action_masks    = torch.stack(self.buffer.action_masks, dim = 0)    .detach()
 
         # calculate advantages
         advantages = (returns.detach() - old_state_values.squeeze().detach()).unsqueeze(-1)
