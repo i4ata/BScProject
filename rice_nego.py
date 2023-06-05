@@ -64,12 +64,13 @@ class Rice:
 
     def __init__(
         self,
+        id,
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
-        region_yamls_filename = 'region_yamls',
-        max_negotiation_steps=5
+        region_yamls_filename='region_yamls',
+        max_negotiation_steps=5,
     ):
         """TODO : init docstring"""
-
+        self.id = id
         assert (
             num_discrete_action_levels > 1
         ), "the number of action levels should be > 1."
@@ -193,7 +194,7 @@ class Rice:
 
         self.decisions = {
             sender : {
-                receiver : 0
+                receiver : np.array(0)
                 for receiver in range(self.num_regions)
                 if receiver != sender
             }
@@ -446,7 +447,8 @@ class Rice:
             else:
                 decision = actions_dict['decisions'][nego_id]
                 self.decisions[agent_id][other_agent_id] = decision
-
+                
+                # If there has been an agreement, update the mask and terminate the negotiation
                 if decision and not self.negotiation_done[agent_id][other_agent_id]:
                     self.negotiation_done[agent_id][other_agent_id] = 1 # True
                     self.update_mask_after_nego(agent_id=agent_id, other_agent_id=other_agent_id)
@@ -462,20 +464,27 @@ class Rice:
 
     def register_decisions(self, actions):
         self.register_collective_negotiation(actions, proposals=False)
+
+        # If an agent accepts a proposal from another agent, make sure that the other agent
+        # stopped negotiating with is as well
+        for agent_id in self.negotiation_done:
+            for other_agent_id in self.negotiation_done[agent_id]:
+                if self.negotiation_done[agent_id][other_agent_id]:
+                    self.negotiation_done[other_agent_id][agent_id] = 1
         
     def update_mask_after_nego(self, agent_id: int, other_agent_id: int):
         
         # Accept the proposal
         self.agent_action_masks[agent_id] = np.logical_and(
             self.agent_action_masks[agent_id], 
-            self.proposals[other_agent_id][agent_id]
-        ).reshape(-1, self.num_discrete_action_levels)
+            self.proposals[other_agent_id][agent_id].reshape(-1, self.num_discrete_action_levels)
+        )
 
         # Keep the promise
         self.agent_action_masks[other_agent_id] = np.logical_and(
             self.agent_action_masks[other_agent_id], 
-            self.promises[agent_id][other_agent_id]
-        ).reshape(-1, self.num_discrete_action_levels)
+            self.promises[agent_id][other_agent_id].reshape(-1, self.num_discrete_action_levels)
+        )
 
     def update_mask(self, agent_id : int):
 
