@@ -40,8 +40,8 @@ class Actor(nn.Module):
 
         x = self.fc1(state)
 
-        output, self.hidden_state = self.lstm(x, self.hidden_state)
-        logits = self.activation(self.fc3(self.activation(self.fc2(output))))
+        self.hidden_state = self.lstm(x, self.hidden_state)
+        logits = self.activation(self.fc3(self.activation(self.fc2(self.hidden_state[0]))))
 
         decision_probs, proposal_probs, promise_probs = zip(
             *[(head['decision'](logits), head['proposal'](logits), head['promise'](logits)) 

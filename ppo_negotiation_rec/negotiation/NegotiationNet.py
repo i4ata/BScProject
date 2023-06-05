@@ -18,9 +18,9 @@ class NegotiationNet(ActorCritic):
 
         super(NegotiationNet, self).__init__()
 
-        self.state_space = n_features + 2 * (env.num_agents - 1) * env.len_actions
+        self.state_space = n_features + 2 * (env.num_regions - 1) * env.len_actions
 
-        self.actor = Actor(state_space=self.state_space, action_space=env.len_actions, num_agents=env.num_agents)
+        self.actor = Actor(state_space=self.state_space, action_space=env.len_actions, num_agents=env.num_regions)
         self.critic = Critic(state_space=self.state_space)
 
 

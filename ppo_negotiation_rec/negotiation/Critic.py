@@ -22,6 +22,6 @@ class Critic(nn.Module):
         
         x = self.fc1(state)
 
-        output, self.hidden_state = self.lstm(x, self.hidden_state)
+        self.hidden_state = self.lstm(x, self.hidden_state)
         
-        return self.fc3(self.activation(self.fc2(output)))
+        return self.fc3(self.activation(self.fc2(self.hidden_state[0])))
