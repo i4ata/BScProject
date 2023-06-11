@@ -28,6 +28,18 @@ class RolloutBuffer:
 
         self.proposals_states = []
         self.promises_states = []
+
+        self.hidden_states_proposals_actor = []
+        self.hidden_states_proposals_critic = []
+
+        self.hidden_states_decisions_actor = []
+        self.hidden_states_decisions_critic = []
+
+        self.rewards_proposals = []
+        self.rewards_decisions = []
+
+        self.state_values_decisions = []
+        self.state_values_proposals = []
     
     def clear(self):
         del self.decisions[:]
@@ -46,6 +58,17 @@ class RolloutBuffer:
 
         del self.proposals_states[:]
         del self.promises_states[:]
+        del self.hidden_states_proposals_actor[:]
+        del self.hidden_states_proposals_critic[:]
+        del self.hidden_states_decisions_actor[:]
+        del self.hidden_states_decisions_critic[:]
+        del self.rewards_proposals[:]
+        del self.rewards_decisions[:]
+
+        del self.state_values_decisions[:]
+        del self.state_values_proposals[:]
+
+        
 
 class ActorCritic(nn.Module):
     def __init__(self):

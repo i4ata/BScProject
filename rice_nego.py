@@ -12,6 +12,8 @@ import logging
 import os
 import sys
 
+from typing import List, Dict, Tuple
+
 import numpy as np
 from gym.spaces import MultiDiscrete
 
@@ -167,7 +169,7 @@ class Rice:
         
         self.negotiation_done = {
             sender : {
-                receiver : 0
+                receiver : False
                 for receiver in range(self.num_regions)
                 if receiver != sender
             }
@@ -200,6 +202,8 @@ class Rice:
             }
             for sender in range(self.num_regions)
         }
+
+        self.negotiation_step = 0
 
     def reset(self):
         """
@@ -356,7 +360,7 @@ class Rice:
         # Reset negotiation recorder
         self.negotiation_done = {
             sender : {
-                receiver : 0
+                receiver : False
                 for receiver in range(self.num_regions)
                 if receiver != sender
             }
@@ -438,19 +442,19 @@ class Rice:
         
         nego_id = 0
         for other_agent_id in range(self.num_regions):
-            if other_agent_id == agent_id:
+            if other_agent_id == agent_id or self.negotiation_done[agent_id][other_agent_id]:
                 continue
 
             if proposals:
-                self.proposals[agent_id][other_agent_id] = actions_dict['proposals'][nego_id]
-                self.promises[agent_id][other_agent_id] = actions_dict['promises'][nego_id]
+                self.proposals[agent_id][other_agent_id] = actions_dict['proposals'][nego_id].reshape(-1, self.num_discrete_action_levels)
+                self.promises[agent_id][other_agent_id] = actions_dict['promises'][nego_id].reshape(-1, self.num_discrete_action_levels)
             else:
                 decision = actions_dict['decisions'][nego_id]
                 self.decisions[agent_id][other_agent_id] = decision
                 
                 # If there has been an agreement, update the mask and terminate the negotiation
-                if decision and not self.negotiation_done[agent_id][other_agent_id]:
-                    self.negotiation_done[agent_id][other_agent_id] = 1 # True
+                if decision:
+                    self.negotiation_done[agent_id][other_agent_id] = True
                     self.update_mask_after_nego(agent_id=agent_id, other_agent_id=other_agent_id)
             
             nego_id += 1
@@ -459,18 +463,19 @@ class Rice:
         for agent_id in actions:
             self.register_negotiation(agent_id, actions[agent_id], proposals)
 
-    def register_proposals(self, actions: dict):
+    def register_proposals(self, actions: dict, step: int) -> List[float]:
         self.register_collective_negotiation(actions, proposals=True)
+        return self.step_collective_proposals(step)
 
     def register_decisions(self, actions):
         self.register_collective_negotiation(actions, proposals=False)
 
         # If an agent accepts a proposal from another agent, make sure that the other agent
-        # stopped negotiating with is as well
+        # stopped negotiating with it as well
         for agent_id in self.negotiation_done:
             for other_agent_id in self.negotiation_done[agent_id]:
                 if self.negotiation_done[agent_id][other_agent_id]:
-                    self.negotiation_done[other_agent_id][agent_id] = 1
+                    self.negotiation_done[other_agent_id][agent_id] = True
         
     def update_mask_after_nego(self, agent_id: int, other_agent_id: int):
         
@@ -486,23 +491,22 @@ class Rice:
             self.promises[agent_id][other_agent_id].reshape(-1, self.num_discrete_action_levels)
         )
 
-    def update_mask(self, agent_id : int):
+    def step_collective_proposals(self, step):
+        return [self.step_proposals(agent_id, step) for agent_id in range(self.num_regions)]
 
-        accepted_proposals = [np.array(self.proposals[other_agent_id][agent_id])
-                              for other_agent_id in range(self.num_regions)
-                              if agent_id != other_agent_id and self.decisions[agent_id][other_agent_id]]
-            
-        accepted_promises = [np.array(self.promises[agent_id][other_agent_id])
-                             for other_agent_id in range(self.num_regions)
-                             if agent_id != other_agent_id and self.decisions[other_agent_id][agent_id]]
+    # Compute reward based on proposals and promises of a single agent
+    def step_proposals(self, agent_id: int, step: int) -> float:
 
-        self.agent_action_masks[agent_id] = np.logical_and.reduce(
-            accepted_promises + accepted_proposals + [self.default_agent_action_mask.flatten()]
-        ).reshape(-1, self.num_discrete_action_levels)
+        # reward = # agents with which the agent is still negotiating * punishment for takin too long to reach an agreement
+        negotiation_status = map(lambda x: not x, self.negotiation_done[agent_id].values())
+        reward = sum(negotiation_status) * (1 - step / self.max_negotiation_steps)
 
-    def update_masks(self):
-        for agent_id in range(self.num_regions):
-            self.update_mask(agent_id)
+        # Check if the agent can keep the promises it made. If not, punish it
+        mask_kept_promises = np.logical_and.reduce(list(self.promises[agent_id].values())) & self.agent_action_masks[agent_id]
+        if np.any(np.all(~mask_kept_promises, axis = 0)):
+            reward -= 10
+
+        return reward
 
     def generate_observation(self):
         """

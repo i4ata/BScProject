@@ -7,17 +7,17 @@ from Interfaces import ActorCritic
 
 import sys
 sys.path.append("..")
-from rice import Rice
+from gym.spaces import MultiDiscrete
 
 from typing import Tuple, List
 
 class ActivityNet(ActorCritic):
-    def __init__(self, env : Rice, n_features: int, params : dict = None):
+    def __init__(self, state_space: int, action_space : MultiDiscrete, params : dict = None):
         
         super(ActivityNet, self).__init__()
 
-        self.state_space = n_features
-        self.action_space = env.action_space[0] #? fix that
+        self.state_space = state_space
+        self.action_space = action_space
 
         self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
@@ -34,7 +34,7 @@ class ActivityNet(ActorCritic):
         ])
         
         self.critic = nn.Sequential(
-            nn.Linear(self.state_space + env.len_actions, 64),
+            nn.Linear(self.state_space + action_space.nvec.sum(), 64),
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),

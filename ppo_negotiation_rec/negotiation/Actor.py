@@ -50,6 +50,6 @@ class Actor(nn.Module):
 
         decision_probs = torch.stack(decision_probs, dim = 1)
         proposal_probs = torch.stack(proposal_probs, dim = 1)
-        promise_probs =  torch.stack(promise_probs, dim = 1)
+        promise_probs  = torch.stack(promise_probs, dim = 1)
 
         return decision_probs, proposal_probs, promise_probs

@@ -8,19 +8,20 @@ from negotiation.Critic import Critic
 
 import sys
 sys.path.append("..")
-from rice import Rice
+from gym.spaces import MultiDiscrete
 
 from typing import Tuple, Dict, List
 
 class NegotiationNet(ActorCritic):
     
-    def __init__(self, env: Rice, n_features: int, params: dict = None):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, params: dict = None):
 
         super(NegotiationNet, self).__init__()
 
-        self.state_space = n_features + 2 * (env.num_regions - 1) * env.len_actions
+        self.state_space = state_space + 2 * (n_agents - 1) * action_space.nvec.sum()
+        self.action_space = action_space.nvec.sum()
 
-        self.actor = Actor(state_space=self.state_space, action_space=env.len_actions, num_agents=env.num_regions)
+        self.actor = Actor(state_space=self.state_space, action_space=self.action_space, num_agents=n_agents)
         self.critic = Critic(state_space=self.state_space)
 
 
@@ -39,7 +40,7 @@ class NegotiationNet(ActorCritic):
 
             decisions = (torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1
             proposals = (torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1
-            promises  = (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
+            promises  = (torch.rand(promise_probs .shape).to(promise_probs .device) < promise_probs ) * 1
 
             log_probs_decisions = torch.log(torch.abs(decisions - decision_probs))
             log_probs_proposals = torch.log(torch.abs(proposals - proposal_probs))
@@ -62,28 +63,35 @@ class NegotiationNet(ActorCritic):
 
         return return_dict, state_value
 
-    def evaluate(self, env_state: torch.Tensor, **kwargs) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
+    def evaluate(self, env_state: torch.Tensor, **kwargs) -> Dict[str, Dict[str, torch.Tensor]]:
         
         decisions = kwargs['actions']['decisions']
         proposals = kwargs['actions']['proposals']
-        promises = kwargs['actions']['promises']
+        promises  = kwargs['actions']['promises' ]
 
         proposals_state = kwargs['states']['proposals']
-        promises_state = kwargs['states']['promises']
+        promises_state  = kwargs['states']['promises' ]
 
         negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
 
-        decision_probs, proposal_probs, promise_probs = self.actor(negotiation_state)
+        self.actor.hidden_state = kwargs['hidden_state']['decisions']['actor']
+        self.critic.hidden_state = kwargs['hidden_state']['decisions']['critic']
+        decision_probs, _, _ = self.actor(negotiation_state)
+        state_value_decision = self.critic(negotiation_state)
 
-        state_value = self.critic(negotiation_state)
+        self.actor.hidden_state = kwargs['hidden_state']['proposals']['actor']
+        self.critic.hidden_state = kwargs['hidden_state']['proposals']['critic']
+        _, proposal_probs, promise_probs = self.actor(negotiation_state)
+        state_value_proposal = self.critic(negotiation_state)
+
 
         decision_log_probs = torch.log(torch.abs(decisions - decision_probs))
         proposal_log_probs = torch.log(torch.abs(proposals - proposal_probs))
-        promise_log_probs = torch.log(torch.abs(promises - promise_probs))
+        promise_log_probs  = torch.log(torch.abs(promises  - promise_probs))
 
         decision_entropies = - decision_probs * torch.log2(decision_probs) - (1 - decision_probs) * torch.log2(1 - decision_probs)
         proposal_entropies = - proposal_probs * torch.log2(proposal_probs) - (1 - proposal_probs) * torch.log2(1 - proposal_probs)
-        promise_entropies = - promise_probs * torch.log2(promise_probs) - (1 - promise_probs) * torch.log2(1 - promise_probs)
+        promise_entropies  = - promise_probs  * torch.log2(promise_probs ) - (1 - promise_probs ) * torch.log2(1 - promise_probs)
 
         return_dict = {
             'decisions' : {
@@ -97,10 +105,14 @@ class NegotiationNet(ActorCritic):
             'promises' : {
                 'log_probs' : promise_log_probs,
                 'entropies' : promise_entropies
+            },
+            'state_values' : {
+                'decision' : state_value_decision,
+                'proposal' : state_value_proposal
             }
         }
 
-        return return_dict, state_value
+        return return_dict
     
     def act_deterministically(self, env_state: torch.Tensor, **kwargs) -> Dict[str, np.ndarray]:
         with torch.no_grad():

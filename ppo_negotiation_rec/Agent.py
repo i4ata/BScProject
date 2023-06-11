@@ -13,13 +13,19 @@ from typing import Dict, List
 
 import sys
 sys.path.append("..")
-from rice import Rice
+from gym.spaces import MultiDiscrete
 
 class Agent():
-    def __init__(self, env : Rice, intial_state : dict, id : int, device : str = 'cpu'):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, id : int, device : str = 'cpu'):
         self.nets: Dict[str, PPO] = {
-            'activityNet' : PPOActivity(model = ActivityNet(env, len(intial_state['features'])), params = None, device = device),
-            'negotiationNet' : PPONegotiation(model = NegotiationNet(env, len(intial_state['features'])), params = None, device = device)
+            'activityNet' : PPOActivity(
+                model = ActivityNet(state_space=state_space, action_space=action_space), 
+                params = None, device = device
+            ),
+            'negotiationNet' : PPONegotiation(
+                model = NegotiationNet(state_space=state_space, action_space=action_space, n_agents=n_agents), 
+                params = None, device = device
+            )
         }
 
         self.device = device
@@ -40,7 +46,9 @@ class Agent():
             save = with_mask
         )
     
-    def negotiate(self, states: List[Dict[str, np.ndarray]], save_map: Dict[str, bool]) -> List[np.ndarray]:
+    def negotiate(self, 
+                  states: List[Dict[str, np.ndarray]], 
+                  save_map: Dict[str, bool]) -> List[np.ndarray]:
 
         features = torch.FloatTensor(np.array([state['features'] for state in states])).to(self.device)
         
@@ -101,3 +109,10 @@ class Agent():
         )
 
         return actions
+
+    def reset_negotiation_hs(self):
+        self.nets['negotiationNet'].policy_old.actor.hidden_state = None
+        self.nets['negotiationNet'].policy_old.critic.hidden_state = None
+
+        self.nets['negotiationNet'].policy.actor.hidden_state = None
+        self.nets['negotiationNet'].policy.critic.hidden_state = None
