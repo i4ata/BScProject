@@ -122,7 +122,7 @@ class NegotiationNet(ActorCritic):
 
             negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
 
-            decision_probs, proposal_probs, promise_probs = self._get_probs(negotiation_state)
+            decision_probs, proposal_probs, promise_probs = self.actor(negotiation_state)
             
             decisions = ((decision_probs > .5) * 1) .detach().cpu().numpy()
             proposals = ((proposal_probs > .5) * 1) .detach().cpu().numpy()
@@ -143,17 +143,11 @@ class NegotiationNet(ActorCritic):
 
             negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
 
-            decision_probs, proposal_probs, promise_probs = self._get_probs(negotiation_state)
+            decision_probs, proposal_probs, promise_probs = self.actor(negotiation_state)
             
-            decisions = (
-                (torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1
-            ).detach().cpu().numpy()
-            proposals = (
-                (torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1
-            ).detach().cpu().numpy()
-            promises  = (
-                (torch.rand(promise_probs.shape).to(promise_probs.device) < promise_probs) * 1
-            ).detach().cpu().numpy()
+            decisions = ((torch.rand(decision_probs.shape) < decision_probs.cpu()) * 1).detach().numpy()
+            proposals = ((torch.rand(proposal_probs.shape) < proposal_probs.cpu()) * 1).detach().numpy()
+            promises  = ((torch.rand(promise_probs.shape ) < promise_probs .cpu()) * 1).detach().numpy()
 
             return_dict = {
                 'decisions': decisions,
