@@ -98,14 +98,15 @@ class PPONegotiation(PPO):
         old_proposals_states                = torch.stack(self.buffer.proposals_states)                 .detach()
         old_promises_states                 = torch.stack(self.buffer.promises_states)                  .detach()
         
-        old_hidden_states_decisions_actor   = torch.stack(self.buffer.hidden_states_decisions_actor)    .detach()
-        old_hidden_states_decisions_critic  = torch.stack(self.buffer.hidden_states_decisions_critic)   .detach()
-        
-        old_hidden_states_proposals_actor   = torch.stack(self.buffer.hidden_states_proposals_actor)    .detach()
-        old_hidden_states_proposals_critic  = torch.stack(self.buffer.hidden_states_proposals_critic)   .detach()
-        
         old_state_values_decisions          = torch.stack(self.buffer.state_values_decisions)           .detach()
         old_state_values_proposals          = torch.stack(self.buffer.state_values_proposals)           .detach()
+
+        old_hidden_states_decisions_actor   = self.to_tuple(self.buffer.hidden_states_decisions_actor)
+        old_hidden_states_decisions_critic  = self.to_tuple(self.buffer.hidden_states_decisions_critic)
+        
+        old_hidden_states_proposals_actor   = self.to_tuple(self.buffer.hidden_states_proposals_actor)
+        old_hidden_states_proposals_critic  = self.to_tuple(self.buffer.hidden_states_decisions_critic)
+        
 
         # calculate advantages
         advantages_decisions = (returns_decisions.detach() - old_state_values_decisions.squeeze()).unsqueeze(-1).unsqueeze(-1)
@@ -177,3 +178,7 @@ class PPONegotiation(PPO):
 
         # clear buffer
         self.buffer.clear()
+
+    # Transform a list of 1d hidden states to 1 2d hidden state
+    def to_tuple(self, xs: List[Tuple[torch.Tensor, torch.Tensor]]) -> Tuple[torch.Tensor, torch.Tensor]:
+        return (torch.stack([x[0] for x in xs]).detach(), torch.stack([x[1] for x in xs]).detach())

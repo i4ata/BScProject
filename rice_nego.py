@@ -162,49 +162,6 @@ class Rice:
         self.len_actions = sum(self.actions_nvec)
         self.default_agent_action_mask = np.ones(self.len_actions, dtype=bool).reshape(-1, self.num_discrete_action_levels)
 
-        self.agent_action_masks = {
-            region_id : np.copy(self.default_agent_action_mask)
-            for region_id in range(self.num_regions)
-        }
-        
-        self.negotiation_done = {
-            sender : {
-                receiver : False
-                for receiver in range(self.num_regions)
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.promises = {
-            sender : {
-                receiver : np.copy(self.default_agent_action_mask) 
-                for receiver in range(self.num_regions) 
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.proposals = {
-            sender : {
-                receiver : np.copy(self.default_agent_action_mask) 
-                for receiver in range(self.num_regions) 
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.decisions = {
-            sender : {
-                receiver : np.array(0)
-                for receiver in range(self.num_regions)
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.negotiation_step = 0
-
     def reset(self):
         """
         Reset the environment
@@ -347,6 +304,7 @@ class Rice:
                 norm=1e2,
             )
 
+        self.reset_negotiation()
         return self.generate_observation()
 
     def reset_negotiation(self):
@@ -361,6 +319,33 @@ class Rice:
         self.negotiation_done = {
             sender : {
                 receiver : False
+                for receiver in range(self.num_regions)
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+
+        self.promises = {
+            sender : {
+                receiver : np.copy(self.default_agent_action_mask) 
+                for receiver in range(self.num_regions) 
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+
+        self.proposals = {
+            sender : {
+                receiver : np.copy(self.default_agent_action_mask) 
+                for receiver in range(self.num_regions) 
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+
+        self.decisions = {
+            sender : {
+                receiver : np.array(0)
                 for receiver in range(self.num_regions)
                 if receiver != sender
             }
@@ -467,7 +452,7 @@ class Rice:
         self.register_collective_negotiation(actions, proposals=True)
         return self.step_collective_proposals(step)
 
-    def register_decisions(self, actions):
+    def register_decisions(self, actions: dict, step: int) -> List[float]:
         self.register_collective_negotiation(actions, proposals=False)
 
         # If an agent accepts a proposal from another agent, make sure that the other agent
@@ -476,23 +461,28 @@ class Rice:
             for other_agent_id in self.negotiation_done[agent_id]:
                 if self.negotiation_done[agent_id][other_agent_id]:
                     self.negotiation_done[other_agent_id][agent_id] = True
+
+        return self.step_collective_decisions(step)
         
     def update_mask_after_nego(self, agent_id: int, other_agent_id: int):
         
         # Accept the proposal
         self.agent_action_masks[agent_id] = np.logical_and(
             self.agent_action_masks[agent_id], 
-            self.proposals[other_agent_id][agent_id].reshape(-1, self.num_discrete_action_levels)
+            self.proposals[other_agent_id][agent_id]
         )
 
         # Keep the promise
         self.agent_action_masks[other_agent_id] = np.logical_and(
             self.agent_action_masks[other_agent_id], 
-            self.promises[agent_id][other_agent_id].reshape(-1, self.num_discrete_action_levels)
+            self.promises[agent_id][other_agent_id]
         )
 
     def step_collective_proposals(self, step):
         return [self.step_proposals(agent_id, step) for agent_id in range(self.num_regions)]
+
+    def step_collective_decisions(self, step):
+        return [self.step_decisions(agent_id, step) for agent_id in range(self.num_regions)]
 
     # Compute reward based on proposals and promises of a single agent
     def step_proposals(self, agent_id: int, step: int) -> float:
@@ -504,9 +494,26 @@ class Rice:
         # Check if the agent can keep the promises it made. If not, punish it
         mask_kept_promises = np.logical_and.reduce(list(self.promises[agent_id].values())) & self.agent_action_masks[agent_id]
         if np.any(np.all(~mask_kept_promises, axis = 0)):
-            reward -= 10
+            reward *= -10
 
         return reward
+
+    def step_decisions(self, agent_id, step: int) -> float:
+
+        # reward = # agents with which the agent is still negotiating * punishment for takin too long to reach agreement
+        negotiation_status = self.negotiation_done[agent_id].values()
+        reward = sum(map(lambda x: not x, negotiation_status)) * (1 - step / self.max_negotiation_steps)
+
+        # Check if the agent can fulfill the proposals that it accepted
+        mask_proposals = np.logical_and.reduce(np.array([self.proposals[other_agent_id][agent_id] 
+                                                         for other_agent_id in range(self.num_regions) 
+                                                         if other_agent_id != agent_id])[list(negotiation_status)], 
+                                                axis = 0) & \
+                         self.agent_action_masks[agent_id]
+        if np.any(np.all(~mask_proposals, axis = 0)):
+            reward *= 10
+
+        return -reward
 
     def generate_observation(self):
         """

@@ -74,13 +74,13 @@ class NegotiationNet(ActorCritic):
 
         negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
 
-        self.actor.hidden_state = kwargs['hidden_state']['decisions']['actor']
-        self.critic.hidden_state = kwargs['hidden_state']['decisions']['critic']
+        self.actor.hidden_state = kwargs['hidden_states']['decisions']['actor']
+        self.critic.hidden_state = kwargs['hidden_states']['decisions']['critic']
         decision_probs, _, _ = self.actor(negotiation_state)
         state_value_decision = self.critic(negotiation_state)
 
-        self.actor.hidden_state = kwargs['hidden_state']['proposals']['actor']
-        self.critic.hidden_state = kwargs['hidden_state']['proposals']['critic']
+        self.actor.hidden_state = kwargs['hidden_states']['proposals']['actor']
+        self.critic.hidden_state = kwargs['hidden_states']['proposals']['critic']
         _, proposal_probs, promise_probs = self.actor(negotiation_state)
         state_value_proposal = self.critic(negotiation_state)
 
@@ -164,7 +164,3 @@ class NegotiationNet(ActorCritic):
 
     def get_actor_parameters(self) -> List[nn.parameter.Parameter]:
         return self.actor.parameters()
-    
-    def reset(self):
-        self.actor.hidden_state = None
-        self.critic.hidden_state = None

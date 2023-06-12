@@ -111,6 +111,7 @@ class Agent():
         return actions
 
     def reset_negotiation_hs(self):
+        
         self.nets['negotiationNet'].policy_old.actor.hidden_state = None
         self.nets['negotiationNet'].policy_old.critic.hidden_state = None
 
