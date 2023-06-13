@@ -14,15 +14,15 @@ from typing import Tuple, Dict, List
 
 class NegotiationNet(ActorCritic):
     
-    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, params: dict = None):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, message_length: int, params: dict = None):
 
         super(NegotiationNet, self).__init__()
 
-        self.state_space = state_space + 2 * (n_agents - 1) * action_space.nvec.sum()
+        self.state_space = state_space + 2 * (n_agents - 1) * action_space.nvec.sum() + message_length * (n_agents - 1)
         self.action_space = action_space.nvec.sum()
 
-        self.actor = Actor(state_space=self.state_space, action_space=self.action_space, num_agents=n_agents)
-        self.critic = Critic(state_space=self.state_space)
+        self.actor = Actor(self.state_space, self.action_space, n_agents, message_length)
+        self.critic = Critic(self.state_space)
 
 
     def act(self, env_state : torch.Tensor, **kwargs) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
@@ -31,10 +31,11 @@ class NegotiationNet(ActorCritic):
 
             proposals_state = kwargs['proposals']
             promises_state = kwargs['promises']
+            messages_state = kwargs['messages']
 
-            negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
+            negotiation_state = torch.cat((env_state, proposals_state, promises_state, messages_state), dim = 1).to(env_state.device)
 
-            decision_probs, proposal_probs, promise_probs = self.actor(negotiation_state)
+            decision_probs, proposal_probs, promise_probs, message_logits = self.actor(negotiation_state)
             
             state_value = self.critic(negotiation_state)
 
@@ -58,7 +59,8 @@ class NegotiationNet(ActorCritic):
                 'promises' : {
                     'promises' : promises,
                     'log_probs' : log_probs_promise
-                }
+                },
+                'messages' : message_logits
             }
 
         return return_dict, state_value
@@ -68,22 +70,30 @@ class NegotiationNet(ActorCritic):
         decisions = kwargs['actions']['decisions']
         proposals = kwargs['actions']['proposals']
         promises  = kwargs['actions']['promises' ]
+        messages_proposals = kwargs['actions']['messages']['proposals']
+        messages_decisions = kwargs['actions']['messages']['decisions']
 
         proposals_state = kwargs['states']['proposals']
         promises_state  = kwargs['states']['promises' ]
 
-        negotiation_state = torch.cat((env_state, proposals_state, promises_state), dim = 1).to(env_state.device)
+        proposals_state2 = kwargs['states']['proposals2']
+        promises_state2 = kwargs['states']['promises2']
+        
+        messages_state_decisions = kwargs['messages']['decisions']
+        messages_state_proposals = kwargs['messages']['proposals']
 
-        self.actor.hidden_state = kwargs['hidden_states']['decisions']['actor']
-        self.critic.hidden_state = kwargs['hidden_states']['decisions']['critic']
-        decision_probs, _, _ = self.actor(negotiation_state)
-        state_value_decision = self.critic(negotiation_state)
+        negotiation_state1 = torch.cat((env_state, proposals_state, promises_state, messages_state_decisions), dim = 1).to(env_state.device)
+        negotiation_state2 = torch.cat((env_state, proposals_state2, promises_state2, messages_state_proposals), dim = 1).to(env_state.device)
 
         self.actor.hidden_state = kwargs['hidden_states']['proposals']['actor']
         self.critic.hidden_state = kwargs['hidden_states']['proposals']['critic']
-        _, proposal_probs, promise_probs = self.actor(negotiation_state)
-        state_value_proposal = self.critic(negotiation_state)
+        _, proposal_probs, promise_probs, messages_proposals_logits = self.actor(negotiation_state2)
+        state_value_proposal = self.critic(negotiation_state1)
 
+        self.actor.hidden_state = kwargs['hidden_states']['decisions']['actor']
+        self.critic.hidden_state = kwargs['hidden_states']['decisions']['critic']
+        decision_probs, _, _, messages_decisions_logits = self.actor(negotiation_state1)
+        state_value_decision = self.critic(negotiation_state2)
 
         decision_log_probs = torch.log(torch.abs(decisions - decision_probs))
         proposal_log_probs = torch.log(torch.abs(proposals - proposal_probs))

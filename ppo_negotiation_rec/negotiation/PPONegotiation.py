@@ -21,14 +21,16 @@ class PPONegotiation(PPO):
         return_dict = {
             'decisions' : [decision.cpu().numpy() for decision in actions['decisions']['decisions']],
             'proposals' : [proposal.cpu().numpy() for proposal in actions['proposals']['proposals']],
-            'promises'  : [promise. cpu().numpy() for promise  in actions['promises' ]['promises' ]]
+            'promises'  : [promise. cpu().numpy() for promise  in actions['promises' ]['promises' ]],
+
+            'messages' : [message.cpu().numpy() for message in actions['messages']]
         }
 
         if kwargs['save_state']:
 
             self.buffer.    env_states.                     extend(env_state)
-            self.buffer.    proposals_states.               extend(kwargs['proposals'])
-            self.buffer.    promises_states.                extend(kwargs['promises'])
+            #self.buffer.    proposals_states.               extend(kwargs['proposals'])
+            #self.buffer.    promises_states.                extend(kwargs['promises'])
 
         if kwargs['save_decisions']:
 
@@ -39,6 +41,12 @@ class PPONegotiation(PPO):
             self.buffer.    hidden_states_decisions_critic. extend(zip(*self.policy_old.critic.hidden_state))
 
             self.buffer.    state_values_decisions.         extend(state_val)
+
+            self.buffer.messages_decisions.extend(actions['messages'])
+            self.buffer.messages_state_proposals.extend(kwargs['messages'])
+
+            self.buffer.proposals_states_2.extend(kwargs['proposals'])
+            self.buffer.promises_states_2.extend(kwargs['promises'])
 
 
         if kwargs['save_proposals_promises']:
@@ -53,6 +61,13 @@ class PPONegotiation(PPO):
             self.buffer.    hidden_states_proposals_critic. extend(zip(*self.policy_old.critic.hidden_state))
 
             self.buffer.    state_values_proposals.         extend(state_val)
+
+            self.buffer.messages_proposals.extend(actions['messages'])
+            self.buffer.messages_state_decisions.extend(kwargs['messages'])
+
+            self.buffer.proposals_states.extend(kwargs['proposals'])
+            self.buffer.promises_states.extend(kwargs['promises'])
+            
 
         return return_dict
     
@@ -107,6 +122,14 @@ class PPONegotiation(PPO):
         old_hidden_states_proposals_actor   = self.to_tuple(self.buffer.hidden_states_proposals_actor)
         old_hidden_states_proposals_critic  = self.to_tuple(self.buffer.hidden_states_decisions_critic)
         
+        old_messages_states_proposals = torch.stack(self.buffer.messages_state_proposals).detach()
+        old_messages_states_decisions = torch.stack(self.buffer.messages_state_decisions).detach()
+
+        old_messages_proposals = torch.stack(self.buffer.messages_proposals).detach()
+        old_messages_decisions = torch.stack(self.buffer.messages_decisions).detach()
+
+        old_promises_states_2 = torch.stack(self.buffer.promises_states_2).detach()
+        old_proposals_states_2 = torch.stack(self.buffer.proposals_states_2).detach()
 
         # calculate advantages
         advantages_decisions = (returns_decisions.detach() - old_state_values_decisions.squeeze()).unsqueeze(-1).unsqueeze(-1)
@@ -121,11 +144,18 @@ class PPONegotiation(PPO):
                 actions = {
                     'decisions': old_decisions,
                     'proposals': old_proposals,
-                    'promises' : old_promises
+                    'promises' : old_promises,
+                    'messages' : {
+                        'decisions' : old_messages_decisions,
+                        'proposals' : old_messages_proposals
+                    }
                 },
                 states = {
                     'proposals': old_proposals_states,
-                    'promises' : old_promises_states
+                    'promises' : old_promises_states,
+
+                    'proposals2': old_proposals_states_2,
+                    'promises2' : old_promises_states_2 
                 },
                 hidden_states = {
                     'decisions' : {
@@ -136,6 +166,10 @@ class PPONegotiation(PPO):
                         'actor' : old_hidden_states_proposals_actor,
                         'critic' : old_hidden_states_proposals_critic
                     }
+                },
+                messages = {
+                    'decisions' : old_messages_states_decisions,
+                    'proposals' : old_messages_states_proposals
                 }
             )
             actions = {k : evaluation[k] for k in ['decisions', 'promises', 'proposals']}

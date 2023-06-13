@@ -70,6 +70,7 @@ class Rice:
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
         region_yamls_filename='region_yamls',
         max_negotiation_steps=5,
+        message_length=5
     ):
         """TODO : init docstring"""
         self.id = id
@@ -78,6 +79,8 @@ class Rice:
         ), "the number of action levels should be > 1."
         self.num_discrete_action_levels = num_discrete_action_levels
         self.max_negotiation_steps = max_negotiation_steps
+        self.message_length = message_length
+
         self.float_dtype = np.float32
         self.int_dtype = np.int32
 
@@ -309,13 +312,11 @@ class Rice:
 
     def reset_negotiation(self):
 
-        # Reset masks
         self.agent_action_masks = {
             region_id : np.copy(self.default_agent_action_mask)
             for region_id in range(self.num_regions)
         }
 
-        # Reset negotiation recorder
         self.negotiation_done = {
             sender : {
                 receiver : False
@@ -346,6 +347,24 @@ class Rice:
         self.decisions = {
             sender : {
                 receiver : np.array(0)
+                for receiver in range(self.num_regions)
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+
+        self.messages_proposals = {
+            sender : {
+                receiver : np.zeros(self.message_length)
+                for receiver in range(self.num_regions)
+                if receiver != sender
+            }
+            for sender in range(self.num_regions)
+        }
+
+        self.messages_decisions = {
+            sender : {
+                receiver : np.zeros(self.message_length)
                 for receiver in range(self.num_regions)
                 if receiver != sender
             }
@@ -479,10 +498,10 @@ class Rice:
         )
 
     def step_collective_proposals(self, step):
-        return [self.step_proposals(agent_id, step) for agent_id in range(self.num_regions)]
+        return self.generate_observation(), [self.step_proposals(agent_id, step) for agent_id in range(self.num_regions)]
 
     def step_collective_decisions(self, step):
-        return [self.step_decisions(agent_id, step) for agent_id in range(self.num_regions)]
+        return self.generate_observation(), [self.step_decisions(agent_id, step) for agent_id in range(self.num_regions)]
 
     # Compute reward based on proposals and promises of a single agent
     def step_proposals(self, agent_id: int, step: int) -> float:
@@ -566,6 +585,16 @@ class Rice:
                 },
                 _PROPOSALS: {
                     sender_id: self.proposals[sender_id][region_id]
+                    for sender_id in range(self.num_regions)
+                    if sender_id != region_id
+                },
+                'messages_proposals': {
+                    sender_id: self.messages_proposals[sender_id][region_id]
+                    for sender_id in range(self.num_regions)
+                    if sender_id != region_id
+                },
+                'messages_decisions': {
+                    sender_id: self.messages_decisions[sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 }

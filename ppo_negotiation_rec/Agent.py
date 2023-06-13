@@ -16,14 +16,14 @@ sys.path.append("..")
 from gym.spaces import MultiDiscrete
 
 class Agent():
-    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, id : int, device : str = 'cpu'):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, message_length: int, id : int, device : str = 'cpu'):
         self.nets: Dict[str, PPO] = {
             'activityNet' : PPOActivity(
-                model = ActivityNet(state_space=state_space, action_space=action_space), 
+                model = ActivityNet(state_space, action_space), 
                 params = None, device = device
             ),
             'negotiationNet' : PPONegotiation(
-                model = NegotiationNet(state_space=state_space, action_space=action_space, n_agents=n_agents), 
+                model = NegotiationNet(state_space, action_space, n_agents, message_length), 
                 params = None, device = device
             )
         }
@@ -61,13 +61,32 @@ class Agent():
             np.array(list(state['proposals'].values())).flatten()
             for state in states
         ])).to(self.device)
-        
+
+        message_key = 'messages_proposals' if save_map['save_decisions'] else 'messages_decisions'
+        messages = torch.FloatTensor(np.array([
+            np.array(list(state[message_key].values())).flatten()
+            for state in states
+        ])).to(self.device)
+
+        # messages_proposals = torch.FloatTensor(np.array([
+        #     np.array(list(state['messages_proposals'].values())).flatten()
+        #     for state in states
+        # ])).to(self.device)
+
+        # messages_decisions = torch.FloatTensor(np.array([
+        #     np.array(list(state['messages_decisions'].values())).flatten()
+        #     for state in states
+        # ])).to(self.device)
+
         # tensor_state = torch.cat((features, promises, proposals), dim = 1).to(self.device)
 
         actions = self.nets['negotiationNet'].select_action(
             env_state = features, 
             promises = promises, 
             proposals = proposals,
+            # messages_proposals = messages_proposals,
+            # messages_decisions = messages_decisions,
+            messages = messages,
             save_state = save_map['save_state'],
             save_decisions = save_map['save_decisions'],
             save_proposals_promises = save_map['save_proposals_promises']
