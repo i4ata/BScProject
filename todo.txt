@@ -1,2 +1,2 @@
-in the buffer, save the proposals from the first step of the negotiation as well as the proposals from the second step.
-need to call env.generate_observation() after negotiation steps.
+implement learning from messages,
+fix calculation of rewards for negotiation network.
