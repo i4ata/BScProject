@@ -16,6 +16,7 @@ from typing import List, Dict, Tuple
 from copy import deepcopy
 
 import numpy as np
+from tqdm import tqdm
 from gym.spaces import MultiDiscrete
 
 _PUBLIC_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -180,7 +181,7 @@ class Rice:
                     ]
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'negotiation_status' : 
@@ -196,7 +197,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'promises' : 
@@ -212,7 +213,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'proposals' : 
@@ -228,7 +229,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'decisions' : 
@@ -244,7 +245,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'messages_proposals' : 
@@ -260,7 +261,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'messages_decisions' : 
@@ -276,7 +277,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'rewards' : 
@@ -288,7 +289,7 @@ class Rice:
                     ]
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ]
         }
 
@@ -1183,6 +1184,24 @@ class Rice:
         done = {"__all__": self.current_year == self.end_year}
         info = {}
         return obs, rew, done, info
+
+    def estimate_reward_distribution(self, n_trials: int = 1_000, include_0s: bool = False):
+        rewards: np.ndarray = np.zeros(self.episode_length * n_trials)
+        for trial in tqdm(range(n_trials)):
+            state = self.reset()
+            for step in range(self.episode_length):
+                
+                # Step in the environment with a random action
+                state, reward, _, _ = self.step({
+                    agent_id : np.random.randint(self.num_discrete_action_levels, size=len(self.action_space[agent_id]))
+                    for agent_id in range(self.num_regions)
+                })
+
+                # Save the reward
+                rewards[trial * self.episode_length + step] = reward[0]
+        
+        self.mean_random_reward = rewards.mean() if include_0s else rewards[rewards > 0.].mean()
+        return self.mean_random_reward
 
     def set_global_state(
         self, key=None, value=None, timestep=None, norm=None, region_id=None, dtype=None
