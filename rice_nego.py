@@ -13,6 +13,7 @@ import os
 import sys
 
 from typing import List, Dict, Tuple
+from copy import deepcopy
 
 import numpy as np
 from gym.spaces import MultiDiscrete
@@ -110,6 +111,9 @@ class Rice:
         self.current_year = None  # current year in the simulation
         self.timestep = None  # episode timestep
         self.activity_timestep = None  # timestep pertaining to the activity stage
+        
+        self.negotiation_step = None
+
 
         # Parameters for Armington aggregation
         # TODO : add to yaml
@@ -165,12 +169,136 @@ class Rice:
         self.len_actions = sum(self.actions_nvec)
         self.default_agent_action_mask = np.ones(self.len_actions, dtype=bool).reshape(-1, self.num_discrete_action_levels)
 
+    def init_global_negotiation_state(self):
+        self.global_negotiation_state = {
+            'action_masks' : 
+            [
+                [
+                    [
+                        np.copy(self.default_agent_action_mask)
+                        for region in range(self.num_regions)
+                    ]
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'negotiation_status' : 
+            [
+                [
+                    {
+                        sender : {
+                            receiver : False
+                            for receiver in range(self.num_regions)
+                            if receiver != sender
+                        }
+                        for sender in range(self.num_regions)
+                    }
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'promises' : 
+            [
+                [
+                    {
+                        sender : {
+                            receiver : np.copy(self.default_agent_action_mask)
+                            for receiver in range(self.num_regions)
+                            if receiver != sender
+                        }
+                        for sender in range(self.num_regions)
+                    }
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'proposals' : 
+            [
+                [
+                    {
+                        sender : {
+                            receiver : np.copy(self.default_agent_action_mask)
+                            for receiver in range(self.num_regions)
+                            if receiver != sender
+                        }
+                        for sender in range(self.num_regions)
+                    }
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'decisions' : 
+            [
+                [
+                    {
+                        sender : {
+                            receiver : np.zeros(1, dtype=self.int_dtype)
+                            for receiver in range(self.num_regions)
+                            if receiver != sender
+                        }
+                        for sender in range(self.num_regions)
+                    }
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'messages_proposals' : 
+            [
+                [
+                    {
+                        sender : {
+                            receiver : np.zeros(self.message_length)
+                            for receiver in range(self.num_regions)
+                            if receiver != sender
+                        }
+                        for sender in range(self.num_regions)
+                    }
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'messages_decisions' : 
+            [
+                [
+                    {
+                        sender : {
+                            receiver : np.zeros(self.message_length)
+                            for receiver in range(self.num_regions)
+                            if receiver != sender
+                        }
+                        for sender in range(self.num_regions)
+                    }
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ],
+
+            'rewards' : 
+            [
+                [
+                    [
+                        0
+                        for agent in range(self.num_regions)
+                    ]
+                    for negotiation_step in range(self.max_negotiation_steps)
+                ]
+                for timestep in range(self.episode_length)
+            ]
+        }
+
     def reset(self):
         """
         Reset the environment
         """
         self.timestep = 0
         self.activity_timestep = 0
+        self.negotiation_step = 0
         self.current_year = self.start_year
 
         constants = self.all_constants
@@ -307,69 +435,8 @@ class Rice:
                 norm=1e2,
             )
 
-        self.reset_negotiation()
+        self.init_global_negotiation_state()
         return self.generate_observation()
-
-    def reset_negotiation(self):
-
-        self.agent_action_masks = {
-            region_id : np.copy(self.default_agent_action_mask)
-            for region_id in range(self.num_regions)
-        }
-
-        self.negotiation_done = {
-            sender : {
-                receiver : False
-                for receiver in range(self.num_regions)
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.promises = {
-            sender : {
-                receiver : np.copy(self.default_agent_action_mask) 
-                for receiver in range(self.num_regions) 
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.proposals = {
-            sender : {
-                receiver : np.copy(self.default_agent_action_mask) 
-                for receiver in range(self.num_regions) 
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.decisions = {
-            sender : {
-                receiver : np.array(0)
-                for receiver in range(self.num_regions)
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.messages_proposals = {
-            sender : {
-                receiver : np.zeros(self.message_length)
-                for receiver in range(self.num_regions)
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
-
-        self.messages_decisions = {
-            sender : {
-                receiver : np.zeros(self.message_length)
-                for receiver in range(self.num_regions)
-                if receiver != sender
-            }
-            for sender in range(self.num_regions)
-        }
 
     def init_features(self):
         # Observation array features
@@ -420,6 +487,7 @@ class Rice:
         """
         # Increment timestep
         self.timestep += 1
+        self.negotiation_step = 0
 
         # Carry over the previous global states to the current timestep
         for key in self.global_state:
@@ -432,116 +500,104 @@ class Rice:
             "timestep", self.timestep, self.timestep, dtype=self.int_dtype
         )
 
-        self.reset_negotiation()
-
         return self.climate_and_economy_simulation_step(actions)
 
-    def rollback(self, n = 1):
-        assert self.timestep >= n
-        self.timestep -= n
-        self.activity_timestep -= n
-        return self.generate_observation()
-
-    def register_negotiation(self, agent_id: int, actions_dict: dict, proposals: bool):
+    def register_negotiation(self, agent_id: int, actions_dict: dict, save_proposals: bool):
         
+        t, n_t = self.timestep, self.negotiation_step
+
         nego_id = 0
         for other_agent_id in range(self.num_regions):
-            if other_agent_id == agent_id or self.negotiation_done[agent_id][other_agent_id]:
-                continue
 
-            if proposals:
-                self.proposals[agent_id][other_agent_id] = actions_dict['proposals'][nego_id].reshape(-1, self.num_discrete_action_levels)
-                self.promises[agent_id][other_agent_id] = actions_dict['promises'][nego_id].reshape(-1, self.num_discrete_action_levels)
+            if other_agent_id == agent_id or \
+                (n_t and self.global_negotiation_state['negotiation_status'][t][n_t - 1][agent_id][other_agent_id]):
+                continue
+                
+            if save_proposals:
+                props = actions_dict['proposals'][nego_id].reshape(-1, self.num_discrete_action_levels)
+                proms = actions_dict['promises'][nego_id].reshape(-1, self.num_discrete_action_levels)
+
+                self.global_negotiation_state['proposals'][t][n_t][agent_id][other_agent_id] = props
+                self.global_negotiation_state['promises'][t][n_t][agent_id][other_agent_id] = proms
+
             else:
                 decision = actions_dict['decisions'][nego_id]
-                self.decisions[agent_id][other_agent_id] = decision
+                self.global_negotiation_state['decisions'][t][n_t][agent_id][other_agent_id] = decision
                 
                 # If there has been an agreement, update the mask and terminate the negotiation
                 if decision:
-                    self.negotiation_done[agent_id][other_agent_id] = True
-                    self.update_mask_after_nego(agent_id=agent_id, other_agent_id=other_agent_id)
+                    self.global_negotiation_state['negotiation_status'][t][n_t][agent_id][other_agent_id] = True
+                    self.update_mask_after_nego(agent_id, other_agent_id)
             
             nego_id += 1
             
-    def register_collective_negotiation(self, actions: dict, proposals):
+    def copy_all(self):
+        t, n_t = self.timestep, self.negotiation_step
+        for c in self.global_negotiation_state:
+            if c == 'rewards':
+                continue
+            self.global_negotiation_state[c][t][n_t] = deepcopy(self.global_negotiation_state[c][t][n_t - 1])
+
+    def register_proposals(self, actions: dict):
+        if self.negotiation_step:
+            self.copy_all()
+            
         for agent_id in actions:
-            self.register_negotiation(agent_id, actions[agent_id], proposals)
+            self.register_negotiation(agent_id, actions[agent_id], True)
 
-    def register_proposals(self, actions: dict, step: int) -> Tuple[dict, List[float]]:
-        current_negotiation_status = [list(self.negotiation_done[i].values()) for i in range(self.num_regions)]
+        return self.generate_observation()
 
-        self.register_collective_negotiation(actions, proposals=True)
-
-        return self.step_collective_proposals(step, current_negotiation_status)
-
-    def register_decisions(self, actions: dict, step: int) -> Tuple[dict, List[float]]:
-        current_negotiation_status = [list(self.negotiation_done[i].values()) for i in range(self.num_regions)]
-
-        self.register_collective_negotiation(actions, proposals=False)
+    def register_decisions(self, actions: dict) -> dict:
+        
+        for agent_id in actions:
+            self.register_negotiation(agent_id, actions[agent_id], False)
 
         # If an agent accepts a proposal from another agent, make sure that the other agent
         # stopped negotiating with it as well
-        for agent_id in self.negotiation_done:
-            for other_agent_id in self.negotiation_done[agent_id]:
-                if self.negotiation_done[agent_id][other_agent_id]:
-                    self.negotiation_done[other_agent_id][agent_id] = True
+        s = 'negotiation_status'
+        t, n_t = self.timestep, self.negotiation_step
+        for agent_id in range(self.num_regions):
+            for other_agent_id in self.global_negotiation_state[s][t][n_t][agent_id]:
+                if self.global_negotiation_state[s][t][n_t][agent_id][other_agent_id]:
+                    self.global_negotiation_state[s][t][n_t][other_agent_id][agent_id] = True
 
-        return self.step_collective_decisions(step, current_negotiation_status)
-        
+        for agent_id in range(self.num_regions):
+            self.step_negotiation(agent_id)
+
+        new_state = self.generate_observation()
+        self.negotiation_step += 1
+        return new_state
+
     def update_mask_after_nego(self, agent_id: int, other_agent_id: int):
         
+        t, n_t = self.timestep, self.negotiation_step
+        
         # Accept the proposal
-        self.agent_action_masks[agent_id] = np.logical_and(
-            self.agent_action_masks[agent_id], 
-            self.proposals[other_agent_id][agent_id]
-        )
+        self.global_negotiation_state['action_masks'][t][n_t][agent_id] = \
+            self.global_negotiation_state['proposals'][t][n_t][other_agent_id][agent_id] & \
+                self.global_negotiation_state['action_masks'][t][max(0, n_t - 1)][agent_id]
 
         # Keep the promise
-        self.agent_action_masks[other_agent_id] = np.logical_and(
-            self.agent_action_masks[other_agent_id], 
-            self.promises[agent_id][other_agent_id]
-        )
-
-    def step_collective_proposals(self, step, negotiation_status) -> Tuple[dict, List[float]]:
-        return self.generate_observation(), \
-            [self.step_proposals(agent_id, step, negotiation_status[agent_id]) for agent_id in range(self.num_regions)]
-
-    def step_collective_decisions(self, step, negotiation_status):
-        return self.generate_observation(), \
-            [self.step_decisions(agent_id, step, negotiation_status[agent_id]) for agent_id in range(self.num_regions)]
+        self.global_negotiation_state['action_masks'][t][n_t][other_agent_id] = \
+            self.global_negotiation_state['promises'][t][n_t][other_agent_id][agent_id] & \
+                self.global_negotiation_state['action_masks'][t][max(0, n_t - 1)][other_agent_id]
 
     # Compute reward based on proposals and promises of a single agent
-    def step_proposals(self, agent_id: int, step: int, negotiation_status: List[bool]) -> float:
+    def step_negotiation(self, agent_id: int):
 
-        # reward = # agents with which the agent is still negotiating * punishment for takin too long to reach an agreement
-        negotiation_status = map(lambda x: not x, negotiation_status)
-        reward = sum(negotiation_status) * (1 - step / self.max_negotiation_steps)
+        s = 'negotiation_status'
+        t, n_t = self.timestep, self.negotiation_step
 
-        # Check if the agent can keep the promises it made. If not, punish it
-        mask_kept_promises = np.logical_and.reduce(list(self.promises[agent_id].values())) & self.agent_action_masks[agent_id]
-        if np.any(np.all(~mask_kept_promises, axis = 0)):
-            reward *= -10
+        # reward = the number of agents with which the negotiation just ended
+        reward = sum(self.global_negotiation_state[s][t][n_t][agent_id].values())
+        if n_t:
+            reward -= sum(self.global_negotiation_state[s][t][n_t - 1][agent_id].values())
 
-        return reward
+        # punish the agent if it didn't reach an agreement
+        if n_t == self.max_negotiation_steps - 1:
+            reward = sum(self.global_negotiation_state[s][t][n_t][agent_id].values()) - (self.num_regions - 1)
 
-    def step_decisions(self, agent_id, step: int, negotiation_status: List[bool]) -> float:
-
-        # reward = # agents with which the agent is still negotiating * punishment for takin too long to reach agreement
-        negotiation_status = self.negotiation_done[agent_id].values()
-        reward = sum(map(lambda x: not x, negotiation_status)) * (1 - step / self.max_negotiation_steps)
-
-        # Check if the agent can fulfill the proposals that it accepted
-        accepted_proposals = np.array([
-            self.proposals[other_agent_id][agent_id]
-            for other_agent_id in range(self.num_regions)
-            if other_agent_id != agent_id
-        ])[list(self.negotiation_done[agent_id].values())]
-        mask_proposals = np.logical_and.reduce(accepted_proposals, axis = 0) & self.agent_action_masks[agent_id]
-        
-        if np.any(np.all(~mask_proposals, axis = 0)):
-            reward *= 10
-
-        return -reward
+        self.global_negotiation_state['rewards'][t][n_t][agent_id] = reward
 
     def generate_observation(self):
         """
@@ -582,31 +638,32 @@ class Rice:
             features_dict[region_id] = all_features
 
         # Form the observation dictionary keyed by region id.
+        t, n_t = self.timestep, self.negotiation_step
         obs_dict = {}
         for region_id in range(self.num_regions):
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
-                _ACTION_MASK: self.agent_action_masks[region_id],
+                _ACTION_MASK: self.global_negotiation_state['action_masks'][t][n_t][region_id],
                 _PROMISES: {
-                    sender_id: self.promises[sender_id][region_id]
+                    sender_id: self.global_negotiation_state['promises'][t][n_t][sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 },
                 _PROPOSALS: {
-                    sender_id: self.proposals[sender_id][region_id]
+                    sender_id: self.global_negotiation_state['proposals'][t][n_t][sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 },
-                'messages_proposals': {
-                    sender_id: self.messages_proposals[sender_id][region_id]
-                    for sender_id in range(self.num_regions)
-                    if sender_id != region_id
-                },
-                'messages_decisions': {
-                    sender_id: self.messages_decisions[sender_id][region_id]
-                    for sender_id in range(self.num_regions)
-                    if sender_id != region_id
-                }
+                # 'messages_proposals': {
+                #     sender_id: self.global_negotiation_state['messages_proposals'][self.timestep][self.negotiation_step][sender_id][region_id]
+                #     for sender_id in range(self.num_regions)
+                #     if sender_id != region_id
+                # },
+                # 'messages_decisions': {
+                #     sender_id: self.global_negotiation_state['messages_decisions'][self.timestep][self.negotiation_step][sender_id][region_id]
+                #     for sender_id in range(self.num_regions)
+                #     if sender_id != region_id
+                # }
             }
 
         return obs_dict

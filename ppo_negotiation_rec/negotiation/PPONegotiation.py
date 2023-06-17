@@ -23,7 +23,7 @@ class PPONegotiation(PPO):
             'proposals' : [proposal.cpu().numpy() for proposal in actions['proposals']['proposals']],
             'promises'  : [promise. cpu().numpy() for promise  in actions['promises' ]['promises' ]],
 
-            'messages' : [message.cpu().numpy() for message in actions['messages']]
+            # 'messages' : [message.cpu().numpy() for message in actions['messages']]
         }
 
         if kwargs['save_state']:
@@ -42,8 +42,8 @@ class PPONegotiation(PPO):
 
             self.buffer.    state_values_decisions.         extend(state_val)
 
-            self.buffer.messages_decisions.extend(actions['messages'])
-            self.buffer.messages_state_proposals.extend(kwargs['messages'])
+            # self.buffer.messages_decisions.extend(actions['messages'])
+            # self.buffer.messages_state_proposals.extend(kwargs['messages'])
 
             self.buffer.proposals_states_2.extend(kwargs['proposals'])
             self.buffer.promises_states_2.extend(kwargs['promises'])
@@ -62,8 +62,8 @@ class PPONegotiation(PPO):
 
             self.buffer.    state_values_proposals.         extend(state_val)
 
-            self.buffer.messages_proposals.extend(actions['messages'])
-            self.buffer.messages_state_decisions.extend(kwargs['messages'])
+            # self.buffer.messages_proposals.extend(actions['messages'])
+            # self.buffer.messages_state_decisions.extend(kwargs['messages'])
 
             self.buffer.proposals_states.extend(kwargs['proposals'])
             self.buffer.promises_states.extend(kwargs['promises'])
@@ -122,11 +122,11 @@ class PPONegotiation(PPO):
         old_hidden_states_proposals_actor   = self.to_tuple(self.buffer.hidden_states_proposals_actor)
         old_hidden_states_proposals_critic  = self.to_tuple(self.buffer.hidden_states_decisions_critic)
         
-        old_messages_states_proposals = torch.stack(self.buffer.messages_state_proposals).detach()
-        old_messages_states_decisions = torch.stack(self.buffer.messages_state_decisions).detach()
+        # old_messages_states_proposals = torch.stack(self.buffer.messages_state_proposals).detach()
+        # old_messages_states_decisions = torch.stack(self.buffer.messages_state_decisions).detach()
 
-        old_messages_proposals = torch.stack(self.buffer.messages_proposals).detach()
-        old_messages_decisions = torch.stack(self.buffer.messages_decisions).detach()
+        # old_messages_proposals = torch.stack(self.buffer.messages_proposals).detach()
+        # old_messages_decisions = torch.stack(self.buffer.messages_decisions).detach()
 
         old_promises_states_2 = torch.stack(self.buffer.promises_states_2).detach()
         old_proposals_states_2 = torch.stack(self.buffer.proposals_states_2).detach()
@@ -145,10 +145,10 @@ class PPONegotiation(PPO):
                     'decisions': old_decisions,
                     'proposals': old_proposals,
                     'promises' : old_promises,
-                    'messages' : {
-                        'decisions' : old_messages_decisions,
-                        'proposals' : old_messages_proposals
-                    }
+                    # 'messages' : {
+                    #     'decisions' : old_messages_decisions,
+                    #     'proposals' : old_messages_proposals
+                    # }
                 },
                 states = {
                     'proposals': old_proposals_states,
@@ -167,10 +167,10 @@ class PPONegotiation(PPO):
                         'critic' : old_hidden_states_proposals_critic
                     }
                 },
-                messages = {
-                    'decisions' : old_messages_states_decisions,
-                    'proposals' : old_messages_states_proposals
-                }
+                # messages = {
+                #     'decisions' : old_messages_states_decisions,
+                #     'proposals' : old_messages_states_proposals
+                # }
             )
             actions = {k : evaluation[k] for k in ['decisions', 'promises', 'proposals']}
             state_values_decisions = torch.squeeze(evaluation['state_values']['decision'])

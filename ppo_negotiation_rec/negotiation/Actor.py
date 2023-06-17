@@ -28,7 +28,7 @@ class Actor(nn.Module):
                     nn.Linear(64, action_space),
                     nn.Sigmoid()
                 ),
-                'message' : nn.Linear(64, message_length)
+                # 'message' : nn.Linear(64, message_length)
             })
             for agent in range(num_agents - 1)
         ])
@@ -44,8 +44,13 @@ class Actor(nn.Module):
         self.hidden_state = self.lstm(x, self.hidden_state)
         logits = self.activation(self.fc3(self.activation(self.fc2(self.hidden_state[0]))))
 
-        decision_probs, proposal_probs, promise_probs, message_logits = zip(
-            *[(head['decision'](logits), head['proposal'](logits), head['promise'](logits), head['message'](logits)) 
+        # decision_probs, proposal_probs, promise_probs, message_logits = zip(
+        #     *[(head['decision'](logits), head['proposal'](logits), head['promise'](logits), head['message'](logits)) 
+        #     for head in self.actor_heads]
+        # )
+
+        decision_probs, proposal_probs, promise_probs = zip(
+            *[(head['decision'](logits), head['proposal'](logits), head['promise'](logits)) 
             for head in self.actor_heads]
         )
 
@@ -53,6 +58,6 @@ class Actor(nn.Module):
         proposal_probs = torch.stack(proposal_probs, dim = 1)
         promise_probs  = torch.stack(promise_probs, dim = 1)
 
-        message_logits = torch.stack(message_logits, dim = 1)
+        # message_logits = torch.stack(message_logits, dim = 1)
 
-        return decision_probs, proposal_probs, promise_probs, message_logits
+        return decision_probs, proposal_probs, promise_probs, # message_logits

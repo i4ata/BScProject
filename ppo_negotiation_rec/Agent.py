@@ -62,31 +62,17 @@ class Agent():
             for state in states
         ])).to(self.device)
 
-        message_key = 'messages_proposals' if save_map['save_decisions'] else 'messages_decisions'
-        messages = torch.FloatTensor(np.array([
-            np.array(list(state[message_key].values())).flatten()
-            for state in states
-        ])).to(self.device)
-
-        # messages_proposals = torch.FloatTensor(np.array([
-        #     np.array(list(state['messages_proposals'].values())).flatten()
+        # message_key = 'messages_proposals' if save_map['save_decisions'] else 'messages_decisions'
+        # messages = torch.FloatTensor(np.array([
+        #     np.array(list(state[message_key].values())).flatten()
         #     for state in states
         # ])).to(self.device)
-
-        # messages_decisions = torch.FloatTensor(np.array([
-        #     np.array(list(state['messages_decisions'].values())).flatten()
-        #     for state in states
-        # ])).to(self.device)
-
-        # tensor_state = torch.cat((features, promises, proposals), dim = 1).to(self.device)
 
         actions = self.nets['negotiationNet'].select_action(
             env_state = features, 
             promises = promises, 
             proposals = proposals,
-            # messages_proposals = messages_proposals,
-            # messages_decisions = messages_decisions,
-            messages = messages,
+            # messages = messages,
             save_state = save_map['save_state'],
             save_decisions = save_map['save_decisions'],
             save_proposals_promises = save_map['save_proposals_promises']
