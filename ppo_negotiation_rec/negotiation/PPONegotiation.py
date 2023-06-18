@@ -77,30 +77,20 @@ class PPONegotiation(PPO):
         """
 
         # Monte Carlo estimate of returns
-        returns_decisions = []
-        returns_proposals = []
-        discounted_return_decisions = 0
-        discounted_return_proposals = 0
-        for reward_decision, reward_proposal, is_terminal in zip(
-            reversed(self.buffer.rewards_decisions), 
-            reversed(self.buffer.rewards_proposals), 
+        returns = []
+        discounted_return = 0
+        for reward, is_terminal in zip(
+            reversed(self.buffer.rewards),
             reversed(self.buffer.is_terminals)
         ):
             if is_terminal:
-                discounted_return_decisions = 0
-                discounted_return_proposals = 0
-            discounted_return_decisions = reward_decision + .9 * discounted_return_decisions
-            discounted_return_proposals = reward_proposal + .9 * discounted_return_proposals
-            returns_decisions.insert(0, discounted_return_decisions)
-            returns_proposals.insert(0, discounted_return_proposals)
+                discounted_return = 0
+            discounted_return = reward + .9 * discounted_return
+            returns.insert(0, discounted_return)
 
         # Normalizing the rewards
-        returns_decisions = torch.tensor(returns_decisions, dtype=torch.float32).to(self.device)
-        returns_decisions = (returns_decisions - returns_decisions.mean()) / (returns_decisions.std() + 1e-7)
-
-        returns_proposals = torch.tensor(returns_proposals, dtype=torch.float32).to(self.device)
-        returns_proposals = (returns_proposals - returns_proposals.mean()) / (returns_proposals.std() + 1e-7)
-        
+        returns = torch.tensor(returns, dtype=torch.float32).to(self.device)
+        returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
         # convert list to tensor
         old_states                          = torch.stack(self.buffer.env_states)                       .detach()
@@ -132,8 +122,8 @@ class PPONegotiation(PPO):
         old_proposals_states_2 = torch.stack(self.buffer.proposals_states_2).detach()
 
         # calculate advantages
-        advantages_decisions = (returns_decisions.detach() - old_state_values_decisions.squeeze()).unsqueeze(-1).unsqueeze(-1)
-        advantages_proposals = (returns_proposals.detach() - old_state_values_proposals.squeeze()).unsqueeze(-1).unsqueeze(-1)
+        advantages_decisions = (returns.detach() - old_state_values_decisions.squeeze()).unsqueeze(-1).unsqueeze(-1)
+        advantages_proposals = (returns.detach() - old_state_values_proposals.squeeze()).unsqueeze(-1).unsqueeze(-1)
                     
 
         # Optimize policy for K epochs
@@ -195,8 +185,8 @@ class PPONegotiation(PPO):
             loss = -torch.min(surr1_proposals, surr2_proposals) - \
                     torch.min(surr1_decisions, surr2_decisions) - \
                     torch.min(surr1_promises,  surr2_promises) + \
-                    .5 * self.MseLoss(state_values_proposals, returns_proposals) + \
-                    .5 * self.MseLoss(state_values_decisions, returns_decisions) - \
+                    .5 * self.MseLoss(state_values_proposals, returns) + \
+                    .5 * self.MseLoss(state_values_decisions, returns) - \
                     .01 * actions['decisions']['entropies'] - \
                     .01 * actions['proposals']['entropies'] - \
                     .01 * actions['promises' ]['entropies']

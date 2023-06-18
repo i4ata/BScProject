@@ -103,7 +103,6 @@ class NegotiationNet(ActorCritic):
         self.critic.hidden_state = kwargs['hidden_states']['decisions']['critic']
         # decision_probs, _, _, messages_decisions_logits = self.actor(negotiation_state1)
         decision_probs, _, _ = self.actor(negotiation_state1)
-        
         state_value_decision = self.critic(negotiation_state2)
 
         decision_log_probs = torch.log(torch.abs(decisions - decision_probs))

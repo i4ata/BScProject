@@ -1,2 +1,0 @@
-implement learning from messages,
-fix calculation of rewards for negotiation network.

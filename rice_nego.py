@@ -181,7 +181,7 @@ class Rice:
                     ]
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'negotiation_status' : 
@@ -197,7 +197,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'promises' : 
@@ -213,7 +213,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'proposals' : 
@@ -229,7 +229,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'decisions' : 
@@ -245,7 +245,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'messages_proposals' : 
@@ -261,7 +261,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'messages_decisions' : 
@@ -277,7 +277,7 @@ class Rice:
                     }
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ],
 
             'rewards' : 
@@ -289,7 +289,7 @@ class Rice:
                     ]
                     for negotiation_step in range(self.max_negotiation_steps)
                 ]
-                for timestep in range(self.episode_length + 1)
+                for timestep in range(self.episode_length)
             ]
         }
 
@@ -511,18 +511,18 @@ class Rice:
         for other_agent_id in range(self.num_regions):
 
             if other_agent_id == agent_id or \
-                (n_t and self.global_negotiation_state['negotiation_status'][t][n_t - 1][agent_id][other_agent_id]):
+               self.global_negotiation_state['negotiation_status'][t][max(0, n_t - 1)][agent_id][other_agent_id]:
                 continue
                 
             if save_proposals:
-                props = actions_dict['proposals'][nego_id].reshape(-1, self.num_discrete_action_levels)
-                proms = actions_dict['promises'][nego_id].reshape(-1, self.num_discrete_action_levels)
+                props = actions_dict['proposals'][nego_id].reshape(-1, self.num_discrete_action_levels).astype(bool)
+                proms = actions_dict['promises'][nego_id].reshape(-1, self.num_discrete_action_levels).astype(bool)
 
                 self.global_negotiation_state['proposals'][t][n_t][agent_id][other_agent_id] = props
                 self.global_negotiation_state['promises'][t][n_t][agent_id][other_agent_id] = proms
 
             else:
-                decision = actions_dict['decisions'][nego_id]
+                decision = actions_dict['decisions'][nego_id].astype(bool)
                 self.global_negotiation_state['decisions'][t][n_t][agent_id][other_agent_id] = decision
                 
                 # If there has been an agreement, update the mask and terminate the negotiation
@@ -574,14 +574,16 @@ class Rice:
         t, n_t = self.timestep, self.negotiation_step
         
         # Accept the proposal
-        self.global_negotiation_state['action_masks'][t][n_t][agent_id] = \
-            self.global_negotiation_state['proposals'][t][n_t][other_agent_id][agent_id] & \
-                self.global_negotiation_state['action_masks'][t][max(0, n_t - 1)][agent_id]
-
+        self.global_negotiation_state['action_masks'][t][n_t][agent_id] = np.logical_and(
+            self.global_negotiation_state['proposals'][t][n_t][other_agent_id][agent_id],
+            self.global_negotiation_state['action_masks'][t][max(0, n_t - 1)][agent_id]
+        )
+            
         # Keep the promise
-        self.global_negotiation_state['action_masks'][t][n_t][other_agent_id] = \
-            self.global_negotiation_state['promises'][t][n_t][other_agent_id][agent_id] & \
-                self.global_negotiation_state['action_masks'][t][max(0, n_t - 1)][other_agent_id]
+        self.global_negotiation_state['action_masks'][t][n_t][other_agent_id] = np.logical_and(
+            self.global_negotiation_state['promises'][t][n_t][other_agent_id][agent_id],
+            self.global_negotiation_state['action_masks'][t][max(0, n_t - 1)][other_agent_id]
+        )
 
     # Compute reward based on proposals and promises of a single agent
     def step_negotiation(self, agent_id: int):
@@ -597,6 +599,9 @@ class Rice:
         # punish the agent if it didn't reach an agreement
         if n_t == self.max_negotiation_steps - 1:
             reward = sum(self.global_negotiation_state[s][t][n_t][agent_id].values()) - (self.num_regions - 1)
+
+        if np.logical_not(self.global_negotiation_state['action_masks'][t][n_t][agent_id]).all(0).any():
+            reward *= -10
 
         self.global_negotiation_state['rewards'][t][n_t][agent_id] = reward
 
@@ -644,14 +649,14 @@ class Rice:
         for region_id in range(self.num_regions):
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
-                _ACTION_MASK: self.global_negotiation_state['action_masks'][t][n_t][region_id],
+                _ACTION_MASK: self.global_negotiation_state['action_masks'][max(0, t - 1)][n_t][region_id],
                 _PROMISES: {
-                    sender_id: self.global_negotiation_state['promises'][t][n_t][sender_id][region_id]
+                    sender_id: self.global_negotiation_state['promises'][max(0, t - 1)][n_t][sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 },
                 _PROPOSALS: {
-                    sender_id: self.global_negotiation_state['proposals'][t][n_t][sender_id][region_id]
+                    sender_id: self.global_negotiation_state['proposals'][max(0, t - 1)][n_t][sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 },
@@ -1185,8 +1190,8 @@ class Rice:
         info = {}
         return obs, rew, done, info
 
-    def estimate_reward_distribution(self, n_trials: int = 1_000, include_0s: bool = False):
-        rewards: np.ndarray = np.zeros(self.episode_length * n_trials)
+    def estimate_reward_distribution(self, n_trials: int = 1_000):
+        rewards: np.ndarray = np.zeros((self.episode_length * n_trials, self.num_regions))
         for trial in tqdm(range(n_trials)):
             state = self.reset()
             for step in range(self.episode_length):
@@ -1198,9 +1203,9 @@ class Rice:
                 })
 
                 # Save the reward
-                rewards[trial * self.episode_length + step] = reward[0]
+                rewards[trial * self.episode_length + step] = list(reward.values())
         
-        self.mean_random_reward = rewards.mean() if include_0s else rewards[rewards > 0.].mean()
+        self.mean_random_reward = rewards.mean(axis = 1)
         return self.mean_random_reward
 
     def set_global_state(
