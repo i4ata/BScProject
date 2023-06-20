@@ -50,6 +50,9 @@ class RolloutBuffer:
 
         del self.proposals_states[:]
         del self.promises_states[:]
+
+        del self.hidden_states_actor[:]
+        del self.hidden_states_critic[:]
         
 
 class ActorCritic(nn.Module):

@@ -588,12 +588,13 @@ class Rice:
 
                 i += 1
 
-            if not new_promises:
-                continue
+
             # Punish the agent if it made promises that it can't keep
             mask = self.global_negotiation_state['action_masks'][t][n_t][agent]
+            if not new_promises or np.logical_not(mask).all(0).any():
+                continue
             if np.logical_not(np.logical_and.reduce((*new_promises, mask))).all(0).any():
-                self.global_negotiation_state['rewards_proposals'] -= 10
+                self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= 10
 
         return self.generate_observation()
                 
@@ -1198,9 +1199,8 @@ class Rice:
 
                 # Save the reward
                 rewards[trial * self.episode_length + step] = list(reward.values())
-        
-        self.mean_random_reward = rewards.mean(axis = 1)
-        return self.mean_random_reward
+    
+        return rewards.mean(0)   
 
     def set_global_state(
         self, key=None, value=None, timestep=None, norm=None, region_id=None, dtype=None
