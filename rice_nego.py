@@ -552,8 +552,8 @@ class Rice:
                 status = self.num_regions - 1 - \
                       sum(self.global_negotiation_state['negotiation_status'][t][n_t][agent].values())
 
-                self.global_negotiation_state['rewards_proposals'][t][n_t][agent] += status
-                self.global_negotiation_state['rewards_decisions'][t][n_t][agent] += status
+                self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= status
+                self.global_negotiation_state['rewards_decisions'][t][n_t][agent] -= status
 
         new_state = self.generate_observation()
         self.negotiation_step += 1

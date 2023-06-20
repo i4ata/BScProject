@@ -18,7 +18,11 @@ class ProposalNet(ActorCritic):
 
         super(ProposalNet, self).__init__()
 
-        self.state_space = state_space + n_agents - 1
+        features = state_space
+        negotiation_status = n_agents - 1
+        own_mask = action_space.nvec.sum()
+
+        self.state_space = sum((features, negotiation_status, own_mask))
         self.action_space = action_space.nvec.sum()
 
         self.actor = Actor(self.state_space, self.action_space, n_agents)

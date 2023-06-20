@@ -43,7 +43,7 @@ class Agent():
         # Create a 2D tensor of the features only [batch_size, features]
         # Pass it to the proposal network and receive the promises and proposals
         features = torch.FloatTensor(np.stack([
-            np.append(state['features'], state['negotiation_status'])
+            np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten()))
             for state in states
         ])).to(self.device)
         
@@ -52,7 +52,7 @@ class Agent():
     def make_decisions(self, states: List[Dict[str, np.ndarray]]) -> Dict[str, List[np.ndarray]]:
         
         features = torch.FloatTensor(np.stack([
-            np.append(state['features'], state['negotiation_status']) 
+            np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten())) 
             for state in states
         ])).to(self.device)
         promises = torch.FloatTensor(np.stack([
