@@ -14,8 +14,7 @@ class PPOActivity(PPO):
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
             
-        (actions, actions_logprobs, state_val): Tuple[torch.Tensor, torch.Tensor, torch.Tensor] = \
-            self.policy_old.act(env_state, **kwargs)
+        actions, actions_logprobs, state_val = self.policy_old.act(env_state, **kwargs)
         
         self.buffer.    env_states.     extend(env_state)
         self.buffer.    action_masks.   extend(kwargs['action_mask'])

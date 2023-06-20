@@ -18,7 +18,7 @@ class DecisionNet(ActorCritic):
 
         super(DecisionNet, self).__init__()
 
-        self.state_space = state_space + 2 * (n_agents - 1) * action_space.nvec.sum()
+        self.state_space = state_space + 2 * (n_agents - 1) * action_space.nvec.sum() + n_agents - 1
         self.action_space = 1
 
         self.actor = Actor(self.state_space, n_agents)

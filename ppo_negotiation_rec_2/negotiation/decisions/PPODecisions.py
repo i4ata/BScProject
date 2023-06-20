@@ -14,8 +14,7 @@ class PPODecisions(PPO):
     def select_action(self, env_state, **kwargs) -> List[np.ndarray]:
 
         # Pass the state to the policy and get the decisions, the logprobs, and the state value
-        (decisions, log_probs, state_val) : Tuple[torch.Tensor, torch.Tensor, torch.Tensor] = \
-              self.policy_old.act(env_state, kwargs)
+        decisions, log_probs, state_val = self.policy_old.act(env_state, **kwargs)
 
         # Save in memory
         self.buffer.    env_states.             extend(env_state)
@@ -68,7 +67,7 @@ class PPODecisions(PPO):
         # Optimize policy for K epochs
         for epoch in range(10):
             # Evaluating old actions and values
-            (log_probs, entropies, state_values): Tuple[torch.Tensor, torch.Tensor, torch.Tensor] = self.policy.evaluate(
+            log_probs, entropies, state_values = self.policy.evaluate(
                 old_states,
                 decisions = old_decisions,
                 state_proposals = old_proposals_states,

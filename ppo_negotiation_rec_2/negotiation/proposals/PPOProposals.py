@@ -16,8 +16,7 @@ class PPOProposals(PPO):
         Select action in state `state` and fill in the rollout buffer with the relevant data
         """
 
-        (actions, state_val): Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor] = \
-            self.policy_old.act(env_state)
+        actions, state_val = self.policy_old.act(env_state)
 
         self.buffer.    env_states.             extend(env_state)
         self.buffer.    proposals.              extend(actions['proposals']['proposals'])
@@ -75,7 +74,7 @@ class PPOProposals(PPO):
         # Optimize policy for K epochs
         for _ in range(10):
             # Evaluating old actions and values
-            (actions, state_val): Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]  = self.policy.evaluate(
+            actions, state_val  = self.policy.evaluate(
                 old_states, 
                 proposals = old_proposals,
                 promises = old_promises,

@@ -19,14 +19,14 @@ sys.path.append("..")
 from gym.spaces import MultiDiscrete
 
 class Agent():
-    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, message_length: int, id : int, device : str = 'cpu'):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, id : int, device : str = 'cpu'):
         self.nets: Dict[str, PPO] = {
             'activityNet' : PPOActivity(
                 model = ActivityNet(state_space, action_space), 
                 params = None, device = device
             ),
             'proposalNet' : PPOProposals(
-                model = DecisionNet(state_space, action_space, n_agents), 
+                model = ProposalNet(state_space, action_space, n_agents), 
                 params = None, device = device
             ),
             'decisionNet' : PPODecisions(
@@ -42,18 +42,25 @@ class Agent():
 
         # Create a 2D tensor of the features only [batch_size, features]
         # Pass it to the proposal network and receive the promises and proposals
-        features = torch.FloatTensor(np.stack([state['features'] for state in states])).to(self.device)
+        features = torch.FloatTensor(np.stack([
+            np.append(state['features'], state['negotiation_status'])
+            for state in states
+        ])).to(self.device)
+        
         return self.nets['proposalNet'].select_action(features)
     
-    def make_decisions(self, states: List[Dict[str, np.ndarray]], **kwargs) -> Dict[str, List[np.ndarray]]:
+    def make_decisions(self, states: List[Dict[str, np.ndarray]]) -> Dict[str, List[np.ndarray]]:
         
-        features = torch.FloatTensor(np.stack([state['features'] for state in states])).to(self.device)
+        features = torch.FloatTensor(np.stack([
+            np.append(state['features'], state['negotiation_status']) 
+            for state in states
+        ])).to(self.device)
         promises = torch.FloatTensor(np.stack([
-            np.array(list(state['promises'].values())).flatten()
+            state['promises'].flatten()
             for state in states
         ])).to(self.device)
         proposals = torch.FloatTensor(np.stack([
-            np.array(list(state['proposals'].values())).flatten()
+            state['proposals'].flatten()
             for state in states
         ])).to(self.device)
 
@@ -111,8 +118,10 @@ class Agent():
 
     def reset_negotiation_hs(self):
         
-        self.nets['negotiationNet'].policy_old.actor.hidden_state = None
-        self.nets['negotiationNet'].policy_old.critic.hidden_state = None
+        for net in ('proposalNet', 'decisionNet'):
 
-        self.nets['negotiationNet'].policy.actor.hidden_state = None
-        self.nets['negotiationNet'].policy.critic.hidden_state = None
+            self.nets[net].policy_old.actor.hidden_state = None
+            self.nets[net].policy_old.critic.hidden_state = None
+
+            self.nets[net].policy.actor.hidden_state = None
+            self.nets[net].policy.critic.hidden_state = None

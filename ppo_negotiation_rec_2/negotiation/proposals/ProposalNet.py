@@ -18,7 +18,7 @@ class ProposalNet(ActorCritic):
 
         super(ProposalNet, self).__init__()
 
-        self.state_space = state_space
+        self.state_space = state_space + n_agents - 1
         self.action_space = action_space.nvec.sum()
 
         self.actor = Actor(self.state_space, self.action_space, n_agents)
@@ -29,7 +29,7 @@ class ProposalNet(ActorCritic):
         
         with torch.no_grad():
 
-            (proposal_probs, promise_probs): Tuple[torch.Tensor, torch.Tensor] = self.actor(env_state)
+            proposal_probs, promise_probs = self.actor(env_state)
             state_value: torch.Tensor = self.critic(env_state)
 
             proposals = (torch.rand(proposal_probs.shape).to(proposal_probs.device) < proposal_probs) * 1
@@ -78,7 +78,7 @@ class ProposalNet(ActorCritic):
     def act_deterministically(self, env_state: torch.Tensor) -> Dict[str, np.ndarray]:
         with torch.no_grad():
             
-            (proposal_probs, promise_probs): Tuple[torch.Tensor, torch.Tensor] = self.actor(env_state)
+            proposal_probs, promise_probs = self.actor(env_state)
             
             proposals = ((proposal_probs > .5) * 1) .detach().cpu().numpy()
             promises  = ((promise_probs  > .5) * 1) .detach().cpu().numpy()
@@ -88,7 +88,7 @@ class ProposalNet(ActorCritic):
     def act_stochastically(self, env_state: torch.Tensor) -> Dict[str, np.ndarray]:
         with torch.no_grad():
             
-            (proposal_probs, promise_probs): Tuple[torch.Tensor, torch.Tensor] = self.actor(env_state)
+            proposal_probs, promise_probs = self.actor(env_state)
 
             proposals = ((torch.rand(proposal_probs.shape) < proposal_probs.cpu()) * 1).detach().numpy()
             promises  = ((torch.rand(promise_probs.shape ) < promise_probs .cpu()) * 1).detach().numpy()

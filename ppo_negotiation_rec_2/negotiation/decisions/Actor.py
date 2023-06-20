@@ -7,7 +7,7 @@ class Actor(nn.Module):
     def __init__(self, state_space, num_agents: int):
         super().__init__()
 
-        self.hidden_state = Optional[Tuple[torch.Tensor, torch.Tensor]]
+        self.hidden_state = None
 
         self.fc1 = nn.Linear(state_space, 64)
         self.lstm = nn.LSTMCell(64, 64)
