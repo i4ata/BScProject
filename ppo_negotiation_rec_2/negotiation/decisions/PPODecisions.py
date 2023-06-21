@@ -37,10 +37,7 @@ class PPODecisions(PPO):
         # Monte Carlo estimate of returns
         returns = []
         discounted_return = 0
-        for reward, is_terminal in zip(
-            reversed(self.buffer.rewards),
-            reversed(self.buffer.is_terminals)
-        ):
+        for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
             if is_terminal:
                 discounted_return = 0
             discounted_return = reward + .9 * discounted_return

@@ -41,10 +41,7 @@ class PPOProposals(PPO):
         # Monte Carlo estimate of returns
         returns = []
         discounted_return = 0
-        for reward, is_terminal in zip(
-            reversed(self.buffer.rewards),
-            reversed(self.buffer.is_terminals)
-        ):
+        for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
             if is_terminal:
                 discounted_return = 0
             discounted_return = reward + .9 * discounted_return
@@ -59,6 +56,7 @@ class PPOProposals(PPO):
         
         old_proposals               = torch.stack(self.buffer.proposals)            .detach()
         old_proposals_logprobs      = torch.stack(self.buffer.proposals_logprobs)   .detach()
+
         old_promises                = torch.stack(self.buffer.promises)             .detach()
         old_promises_logprobs       = torch.stack(self.buffer.promises_logprobs)    .detach()
         
@@ -69,7 +67,6 @@ class PPOProposals(PPO):
 
         # calculate advantages
         advantages = (returns.detach() - old_state_values.squeeze()).unsqueeze(-1).unsqueeze(-1)
-                    
 
         # Optimize policy for K epochs
         for _ in range(10):

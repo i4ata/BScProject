@@ -532,8 +532,8 @@ class Rice:
                     self.global_negotiation_state['rewards_decisions'][t][n_t][agent] += 1
 
                     # Punish the agent if it made a promise that it can't fulfill
-                    if np.logical_not(self.global_negotiation_state['action_masks'][t][n_t][agent]).all(0).any():
-                        self.global_negotiation_state['rewards_decisions'][t][n_t][agent] -= 10
+                    #if np.logical_not(self.global_negotiation_state['action_masks'][t][n_t][agent]).all(0).any():
+                    #    self.global_negotiation_state['rewards_decisions'][t][n_t][agent] -= 10
 
                 i += 1
 
@@ -590,11 +590,11 @@ class Rice:
 
 
             # Punish the agent if it made promises that it can't keep
-            mask = self.global_negotiation_state['action_masks'][t][n_t][agent]
-            if not new_promises or np.logical_not(mask).all(0).any():
-                continue
-            if np.logical_not(np.logical_and.reduce((*new_promises, mask))).all(0).any():
-                self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= 10
+            # mask = self.global_negotiation_state['action_masks'][t][n_t][agent]
+            # if not new_promises or np.logical_not(mask).all(0).any():
+            #     continue
+            # if np.logical_not(np.logical_and.reduce((*new_promises, mask))).all(0).any():
+            #     self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= 10
 
         return self.generate_observation()
                 
@@ -655,16 +655,6 @@ class Rice:
                 ]),
                 'negotiation_status':
                     np.array(list(self.global_negotiation_state['negotiation_status'][t][n_t][region_id].values()))
-                # 'messages_proposals': {
-                #     sender_id: self.global_negotiation_state['messages_proposals'][self.timestep][self.negotiation_step][sender_id][region_id]
-                #     for sender_id in range(self.num_regions)
-                #     if sender_id != region_id
-                # },
-                # 'messages_decisions': {
-                #     sender_id: self.global_negotiation_state['messages_decisions'][self.timestep][self.negotiation_step][sender_id][region_id]
-                #     for sender_id in range(self.num_regions)
-                #     if sender_id != region_id
-                # }
             }
 
         return obs_dict

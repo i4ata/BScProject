@@ -86,7 +86,10 @@ class Agent():
             self.nets[net].update()
 
     def eval_negotiate(self, state: Dict[str, np.ndarray], deterministic = True) -> Dict[str, np.ndarray]:
-        features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
+        features = torch.FloatTensor(
+            np.concatenate(state['features'], state['negotiation_status'], state['action_mask'].flatten())
+        ).unsqueeze(0).to(self.device)
+
         promises = torch.FloatTensor(np.array(list(state['promises'].values())).flatten()).unsqueeze(0).to(self.device)
         proposals = torch.FloatTensor(np.array(list(state['proposals'].values())).flatten()).unsqueeze(0).to(self.device)
 

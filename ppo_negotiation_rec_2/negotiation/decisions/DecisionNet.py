@@ -44,7 +44,7 @@ class DecisionNet(ActorCritic):
             state_value: torch.Tensor = self.critic(negotiation_state)
 
             # Sample from the decision probabilities' distributions
-            decisions = (torch.rand(decision_probs.shape).to(decision_probs.device) < decision_probs) * 1
+            decisions = (torch.rand_like(decision_probs).to(decision_probs.device) < decision_probs) * 1
             
             # Get the log probabilities of the samples
             log_probs = torch.log(torch.abs(decisions - decision_probs))
