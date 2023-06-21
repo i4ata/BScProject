@@ -81,6 +81,8 @@ class DecisionNet(ActorCritic):
             # Get probabilities by passing state to actor
             decision_probs: torch.Tensor = self.actor(negotiation_state)
             
+            print(decision_probs)
+
             # Round probabilities to get decisiosn
             decisions = ((decision_probs > .5) * 1).cpu().numpy()
         

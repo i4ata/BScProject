@@ -495,7 +495,7 @@ class Rice:
 
         return self.climate_and_economy_simulation_step(actions)
 
-    def register_decisions(self, decisions: Dict[int, np.ndarray]):
+    def register_decisions(self, decisions: List[np.ndarray]):
 
         t, n_t, d, n_s = self.timestep, self.negotiation_step, 'decisions', 'negotiation_status'
 
@@ -532,8 +532,8 @@ class Rice:
                     self.global_negotiation_state['rewards_decisions'][t][n_t][agent] += 1
 
                     # Punish the agent if it made a promise that it can't fulfill
-                    #if np.logical_not(self.global_negotiation_state['action_masks'][t][n_t][agent]).all(0).any():
-                    #    self.global_negotiation_state['rewards_decisions'][t][n_t][agent] -= 10
+                    if np.logical_not(self.global_negotiation_state['action_masks'][t][n_t][agent]).all(0).any():
+                        self.global_negotiation_state['rewards_decisions'][t][n_t][agent] -= self.num_regions
 
                 i += 1
 
@@ -559,7 +559,7 @@ class Rice:
         self.negotiation_step += 1
         return new_state
 
-    def register_proposals(self, proposals: Dict[int, Dict[str, np.ndarray]]):
+    def register_proposals(self, proposals: List[Dict[str, np.ndarray]]):
 
         t, n_t, n_s = self.timestep, self.negotiation_step, 'negotiation_status'
         pp, pm = 'proposals', 'promises'
@@ -571,7 +571,6 @@ class Rice:
 
         for agent in range(self.num_regions):
             i = 0
-            new_promises = []
             for other in range(self.num_regions):
 
                 if agent == other or self.global_negotiation_state[n_s][t][max(0, n_t - 1)][agent][other]:
@@ -584,17 +583,20 @@ class Rice:
                 self.global_negotiation_state[pp][t][n_t][agent][other] = proposal
                 self.global_negotiation_state[pm][t][n_t][agent][other] = promise
 
-                new_promises.append(promise)
-
                 i += 1
 
-
+            # Get promises made to agents with which the current negotiation is still going
+            new_promises = [
+                self.global_negotiation_state[pm][t][n_t][agent][other] 
+                for other in range(self.num_regions)
+                if agent != other and not self.global_negotiation_state[n_s][t][max(0, n_t - 1)][agent][other]
+            ] 
             # Punish the agent if it made promises that it can't keep
-            # mask = self.global_negotiation_state['action_masks'][t][n_t][agent]
-            # if not new_promises or np.logical_not(mask).all(0).any():
-            #     continue
-            # if np.logical_not(np.logical_and.reduce((*new_promises, mask))).all(0).any():
-            #     self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= 10
+            mask = self.global_negotiation_state['action_masks'][t][n_t][agent]
+            if not new_promises or np.logical_not(mask).all(0).any():
+                continue
+            if np.logical_not(np.logical_and.reduce((*new_promises, mask))).all(0).any():
+                self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= self.num_regions
 
         return self.generate_observation()
                 
