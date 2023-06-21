@@ -1194,6 +1194,14 @@ class Rice:
     
         return rewards.mean(0)   
 
+    def random_run(self) -> None:
+        self.reset()
+        for step in range(self.episode_length):
+            self.step({
+                agent_id : np.random.randint(self.num_discrete_action_levels, size = len(self.action_space[agent_id]))
+                for agent_id in range(self.num_regions)
+            })
+
     def set_global_state(
         self, key=None, value=None, timestep=None, norm=None, region_id=None, dtype=None
     ):

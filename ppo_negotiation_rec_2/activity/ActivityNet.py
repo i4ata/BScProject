@@ -21,9 +21,11 @@ class ActivityNet(ActorCritic):
 
         self.actor_layers = nn.Sequential(
             nn.Linear(self.state_space, 64),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(64, 64),
-            nn.Tanh()
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU()
         )
         
         self.actor_heads = nn.ModuleList([
@@ -33,9 +35,11 @@ class ActivityNet(ActorCritic):
         
         self.critic = nn.Sequential(
             nn.Linear(self.state_space + action_space.nvec.sum(), 64),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(64, 64),
-            nn.Tanh(),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
             nn.Linear(64, 1)
         )
         

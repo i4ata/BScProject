@@ -11,7 +11,8 @@ class Actor(nn.Module):
         self.fc1 = nn.Linear(state_space, 64)
         self.lstm = nn.LSTMCell(64, 64)
         self.fc2 = nn.Linear(64, 64)
-        self.activation = nn.Tanh()
+        self.fc3 = nn.Linear(64, 64)
+        self.activation = nn.ReLU()
 
         self.actor_heads = nn.ModuleList([
             nn.ModuleDict({
@@ -31,7 +32,7 @@ class Actor(nn.Module):
                 hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> Tuple[torch.Tensor, torch.Tensor]:
 
         self.hidden_state = self.lstm(self.fc1(state), hidden_state if hidden_state else self.hidden_state)
-        logits = self.activation(self.fc2(self.hidden_state[0]))
+        logits = self.activation(self.fc3(self.activation(self.fc2(self.hidden_state[0]))))
 
         proposal_probs, promise_probs = zip(
             *[(head['proposal'](logits), head['promise'](logits)) 

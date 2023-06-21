@@ -12,11 +12,13 @@ class Critic(nn.Module):
 
         self.fc1 = nn.Linear(state_space, 64)
         self.lstm = nn.LSTMCell(64, 64)
-        self.fc2 = nn.Linear(64, 1)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 1)
+        self.activation = nn.ReLU()
     
     def forward(self, 
                 state: torch.Tensor, 
                 hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> torch.Tensor:
         
         self.hidden_state = self.lstm(self.fc1(state), hidden_state if hidden_state else self.hidden_state) 
-        return self.fc2(self.hidden_state[0])
+        return self.fc3(self.activation(self.fc2(self.hidden_state[0])))

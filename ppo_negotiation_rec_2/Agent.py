@@ -82,11 +82,14 @@ class Agent():
             action_mask = action_mask,
         )
 
-    def update(self) -> None:
-        for net in self.nets:
-            self.nets[net].update()
+    def update(self, nego_on = True) -> None:
+        if nego_on:
+            for net in self.nets:
+                self.nets[net].update()
+        else:
+            self.nets['activityNet'].update()
 
-    def eval_make_decisions(self, state: Dict[str, np.ndarray], deterministic = True) -> np.ndarray:
+    def eval_make_decisions(self, state: Dict[str, np.ndarray], deterministic = False) -> np.ndarray:
 
         features = torch.FloatTensor(
             np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten()))
@@ -102,7 +105,7 @@ class Agent():
     
         return actions
 
-    def eval_make_proposals(self, state: Dict[str, np.ndarray], deterministic = True) -> Dict[str, np.ndarray]:
+    def eval_make_proposals(self, state: Dict[str, np.ndarray], deterministic = False) -> Dict[str, np.ndarray]:
 
         features = torch.FloatTensor(
             np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten()))
@@ -114,7 +117,7 @@ class Agent():
     
         return actions
     
-    def eval_act(self, state: Dict[str, np.ndarray], deterministic = True) -> np.ndarray:
+    def eval_act(self, state: Dict[str, np.ndarray], deterministic = False) -> np.ndarray:
         features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
         action_mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
 
