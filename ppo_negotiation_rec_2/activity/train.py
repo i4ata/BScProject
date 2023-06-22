@@ -44,7 +44,6 @@ def objective(trial):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     envs = [Rice(i, region_yamls_filename='2_region_yamls') 
             for i in range(params['training']['n_envs'])]
-    
     initial_state = envs[0].reset()
     agents = [Agent(len(initial_state[0]['features']), envs[0].action_space[0], params['ppo'], device) 
               for i in range(envs[0].num_regions)]
@@ -54,7 +53,7 @@ def objective(trial):
     for epoch in range(params['training']['epochs']):
         for batch in range(params['training']['batch_size']):
             states = [env.reset() for env in envs]
-            for t in episode_length:
+            for t in range(episode_length):
 
                 actions = [
                     agents[agent_id].act([state[agent_id] for state in states]) 
@@ -93,9 +92,7 @@ def objective(trial):
             eval_env.step(actions)
         all_rewards.append(np.array(eval_env.global_state['rewards_all_regions']))
 
-    all_rewards = np.stack(all_rewards)
-    return 0
-
+    return np.stack(all_rewards).mean(0, 1).sum()
 
 if __name__ == '__main__':
     study = optuna.create_study(direction = 'maximize')

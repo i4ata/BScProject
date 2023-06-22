@@ -45,7 +45,7 @@ class PPOActivity():
                         {'params': self.policy.critic.parameters(), 'lr': params['lr_critic']}
                     ])
 
-        self.policy_old = ActivityNet(state_space, action_space).to(device)
+        self.policy_old = ActivityNet(state_space, action_space, params['policy']).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.MseLoss = nn.MSELoss()
 

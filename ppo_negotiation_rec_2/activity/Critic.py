@@ -11,7 +11,7 @@ class Critic(nn.Module):
         self.layers = [
             nn.Linear(params['hidden_size_critic'], params['hidden_size_critic']) 
             for i in range(params['n_hidden_layers_critic'])]
-        self.output_layer = nn.Linear(64, 1)
+        self.output_layer = nn.Linear(params['hidden_size_critic'], 1)
         self.activation = nn.ReLU()
 
     def forward(self, env_state: torch.Tensor, action_mask = torch.Tensor) -> torch.Tensor:
