@@ -10,9 +10,9 @@ class Actor(nn.Module):
         super().__init__()
 
         self.input_layer = nn.Linear(state_space, params['hidden_size_actor'])
-        self.hidden_layers = [
+        self.hidden_layers = nn.ModuleList([
             nn.Linear(params['hidden_size_actor'], params['hidden_size_actor']) 
-            for i in range(params['n_hidden_layers_actor'])]
+            for i in range(params['n_hidden_layers_actor'])])
         self.activation = nn.ReLU()
 
         self.heads = nn.ModuleList([

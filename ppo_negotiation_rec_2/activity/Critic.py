@@ -8,9 +8,9 @@ class Critic(nn.Module):
         super().__init__()
 
         self.input_layer = nn.Linear(state_space + action_space.nvec.sum(), params['hidden_size_critic'])
-        self.layers = [
+        self.layers = nn.ModuleList([
             nn.Linear(params['hidden_size_critic'], params['hidden_size_critic']) 
-            for i in range(params['n_hidden_layers_critic'])]
+            for i in range(params['n_hidden_layers_critic'])])
         self.output_layer = nn.Linear(params['hidden_size_critic'], 1)
         self.activation = nn.ReLU()
 
