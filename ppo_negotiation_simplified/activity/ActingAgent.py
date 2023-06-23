@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from activity.PPOActivity import PPOActivity
+from PPOActivity import PPOActivity
 from gym.spaces import MultiDiscrete
 
 from typing import Dict, List
@@ -30,6 +30,7 @@ class Agent():
 
     def eval(self, state: Dict[str, np.ndarray], deterministic = True) -> np.ndarray:
 
+        print(state)
         features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
         mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
 

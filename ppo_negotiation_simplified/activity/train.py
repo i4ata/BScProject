@@ -1,7 +1,7 @@
 from ActingAgent import Agent
 import sys
 sys.path.append('../..')
-from rice_nego import Rice
+from rice_nego_simplfied import Rice
 
 import torch
 import numpy as np
@@ -20,7 +20,7 @@ def create_agents(env: Rice, params: dict = None) -> List[Agent]:
 
 def get_actions(agents: List[Agent], states: List[Dict[str, np.ndarray]]):
 
-    actions = [agents[i].act([[state[i]] for state in states]) for i in range(len(agents))]
+    actions = [agents[i].act([state[i] for state in states]) for i in range(len(agents))]
     actions = [{i : actions[i][j] for i in range(len(agents))} for j in range(len(states))]
     return actions
 
@@ -42,7 +42,7 @@ def eval_agents(agents: List[Agent], env: Rice, epochs: int) -> float:
                 i : agent.eval(state[i], deterministic=False)
                 for i, agent in enumerate(agents) 
             }
-            state = env.step(actions)
+            state, _, _, _ = env.step(actions)
         all_rewards.append(env.global_state['reward_all_regions']['value'])
 
     return np.stack(all_rewards).mean((0, 2)).sum()

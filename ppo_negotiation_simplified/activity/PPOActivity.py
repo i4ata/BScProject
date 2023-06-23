@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 from gym.spaces import MultiDiscrete
 
-from activity.ActivityNet import ActivityNet
+from ActivityNet import ActivityNet
 
 from typing import List
 import yaml
@@ -29,7 +29,7 @@ class PPOActivity():
         if params is not None:
             self.params = params
         else:
-            with open('ppo_negotiation_simplified/activity/params.yml') as f:
+            with open('params.yml') as f:
                 self.params = yaml.load(f, Loader=yaml.FullLoader)['ppo']
         self.device = device
         self.buffer = RolloutBuffer()

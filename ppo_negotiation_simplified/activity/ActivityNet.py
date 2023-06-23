@@ -3,8 +3,8 @@ import torch.nn as nn
 from torch.distributions import Categorical
 import numpy as np
 
-from activity.Actor import Actor
-from activity.Critic import Critic
+from Actor import Actor
+from Critic import Critic
 
 from gym.spaces import MultiDiscrete
 
