@@ -30,7 +30,6 @@ class Agent():
 
     def eval(self, state: Dict[str, np.ndarray], deterministic = True) -> np.ndarray:
 
-        print(state)
         features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
         mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
 
