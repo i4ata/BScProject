@@ -11,6 +11,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def objective(trial):
     twos = [2 ** n for n in range(11)]
+    
     params = {
         'n_envs' : trial.suggest_int('n_envs', 1, 10),
         'epochs' : trial.suggest_int('epochs', 10, 100),

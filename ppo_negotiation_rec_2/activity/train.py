@@ -84,16 +84,16 @@ def objective(trial):
     eval_env = envs[0]
     for epoch in range(eval_epochs):
         state = eval_env.reset()
-        for t in episode_length:
+        for t in range(episode_length):
             actions = {
                 agent_id : agent.eval(state[0], deterministic=False)
                 for agent_id, agent in enumerate(agents) 
             }
             eval_env.step(actions)
-        all_rewards.append(np.array(eval_env.global_state['rewards_all_regions']))
+        all_rewards.append(np.array(eval_env.global_state['reward_all_regions']))
 
-    return np.stack(all_rewards).mean(0, 1).sum()
+    return np.stack(all_rewards).mean((0, 1)).sum()
 
 if __name__ == '__main__':
     study = optuna.create_study(direction = 'maximize')
-    study.optimize(objective, n_trials = 5)
+    study.optimize(objective, n_trials = 5, show_progress_bar=True)
