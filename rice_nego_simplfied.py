@@ -167,7 +167,7 @@ class Rice:
 
     def init_global_negotiation_state(self):
         self.global_negotiation_state = {
-            'action_masks' : np.ones((self.episode_length, self.num_regions, *self.default_agent_action_mask.shape)),
+            'action_masks' : np.ones((self.episode_length + 1, self.num_regions, *self.default_agent_action_mask.shape)),
 
             'promises' : 
             [
@@ -179,7 +179,7 @@ class Rice:
                     }
                     for sender in range(self.num_regions)
                 }
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'proposals' : 
@@ -192,7 +192,7 @@ class Rice:
                     }
                     for sender in range(self.num_regions)
                 }
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
             'decisions' : 
@@ -205,10 +205,10 @@ class Rice:
                     }
                     for sender in range(self.num_regions)
                 }
-                for timestep in range(self.episode_length)
+                for timestep in range(self.episode_length + 1)
             ],
 
-            'rewards' : np.zeros((self.episode_length, self.num_regions))
+            'rewards' : np.zeros((self.episode_length + 1, self.num_regions))
         }
 
     def reset(self):
@@ -511,19 +511,18 @@ class Rice:
             features_dict[region_id] = all_features
 
         # Form the observation dictionary keyed by region id.
-        t = max(0, self.timestep - 1)
         obs_dict = {}
         for region_id in range(self.num_regions):
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
-                _ACTION_MASK: self.global_negotiation_state['action_masks'][t][region_id],
+                _ACTION_MASK: self.global_negotiation_state['action_masks'][self.timestep][region_id],
                 _PROMISES: np.stack([
-                    self.global_negotiation_state['promises'][t][sender_id][region_id]
+                    self.global_negotiation_state['promises'][self.timestep][sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 ]),
                 _PROPOSALS: np.stack([
-                    self.global_negotiation_state['proposals'][t][sender_id][region_id]
+                    self.global_negotiation_state['proposals'][self.timestep][sender_id][region_id]
                     for sender_id in range(self.num_regions)
                     if sender_id != region_id
                 ])

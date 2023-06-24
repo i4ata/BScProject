@@ -11,7 +11,7 @@ class Actor(nn.Module):
             nn.Linear(params['hidden_size_actor'], params['hidden_size_actor'])
             for i in range(params['n_hidden_layers_actor'])
         ])
-        self.activation = nn.ReLU()
+        self.activation = nn.Tanh()
 
         self.heads = nn.ModuleList([
             nn.ModuleDict({

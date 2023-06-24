@@ -3,21 +3,22 @@ import torch.nn as nn
 import numpy as np
 from gym.spaces import MultiDiscrete
 
-from ActivityNet import ActivityNet
+from activity.ActivityNet import ActivityNet
 
-from typing import List
+from typing import List, Optional
 import yaml
+import os
 
 class RolloutBuffer:
     def __init__(self):
 
-        self.actions = None
-        self.logprobs = None
-        self.action_masks = None
-        self.env_states = None
-        self.rewards = None
-        self.state_values = None
-        self.is_terminals = None
+        self.actions: Optional[List[List[torch.Tensor]]] = None
+        self.logprobs: Optional[List[List[torch.Tensor]]] = None
+        self.action_masks: Optional[List[List[torch.Tensor]]] = None
+        self.env_states: Optional[List[List[torch.Tensor]]] = None
+        self.rewards: Optional[List[List[torch.Tensor]]] = None
+        self.state_values: Optional[List[List[torch.Tensor]]] = None
+        self.is_terminals: Optional[List[List[torch.Tensor]]] = None
 
     def clear(self):
         self.__init__()
@@ -29,7 +30,7 @@ class PPOActivity():
         if params is not None:
             self.params = params
         else:
-            with open('params.yml') as f:
+            with open('activity/params.yml') as f:
                 self.params = yaml.load(f, Loader=yaml.FullLoader)['ppo']
         self.device = device
         self.buffer = RolloutBuffer()

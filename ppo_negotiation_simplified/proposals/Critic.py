@@ -12,9 +12,7 @@ class Critic(nn.Module):
             for i in range(params['n_hidden_layers_critic'])
         ])
         self.output_layer = nn.Linear(params['hidden_size_critic'], 1)
-        self.activation = nn.ReLU()
-
-        self.activation = nn.ReLU()
+        self.activation = nn.Tanh()
     
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         

@@ -16,7 +16,8 @@ def create_envs(n: int) -> List[Rice]:
 def create_agents(env: Rice, params: dict = None) -> List[Agent]:
     s = env.reset()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    return [Agent(len(s[i]['features']), env.action_space[i], params, device) for i in range(env.num_regions)]
+    return [Agent(len(s[i]['features']), env.action_space[i], env.num_regions, device) 
+            for i in range(env.num_regions)]
 
 def get_actions(agents: List[Agent], states: List[Dict[str, np.ndarray]]):
 

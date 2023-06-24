@@ -1,5 +1,5 @@
-lr_actor: 0.002
-lr_critic: 0.05
+lr_actor: 0.001
+lr_critic: 0.001
 K_epochs: 40
 eps_clip: 0.3
 entropy_coef: 0.1
@@ -9,9 +9,9 @@ gamma: 0.9923157316342434
 policy:
   
   actor:
-    n_hidden_layers_actor: 4
-    hidden_size_actor: 128
+    n_hidden_layers_actor: 3
+    hidden_size_actor: 64
   
   critic:
-    n_hidden_layers_critic: 4
-    hidden_size_critic: 128
+    n_hidden_layers_critic: 3
+    hidden_size_critic: 64

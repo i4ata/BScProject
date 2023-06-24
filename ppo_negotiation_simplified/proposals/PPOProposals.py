@@ -6,38 +6,30 @@ import yaml
 
 from proposals.ProposalNet import ProposalNet
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 ################################## PPO Policy ##################################
 
 class RolloutBuffer:
     def __init__(self):
 
-        self.proposals = []
-        self.proposals_logprobs = []
-        self.promises = []
-        self.promises_logprobs = []
-        self.env_states = []
-        self.rewards = []
-        self.state_values = []
-        self.is_terminals = []
+        self.proposals: Optional[List[List[torch.Tensor]]] = None
+        self.proposals_logprobs: Optional[List[List[torch.Tensor]]] = None
+        self.promises: Optional[List[List[torch.Tensor]]] = None
+        self.promises_logprobs: Optional[List[List[torch.Tensor]]] = None
+        self.env_states: Optional[List[List[torch.Tensor]]] = None
+        self.rewards: Optional[List[List[torch.Tensor]]] = None
+        self.state_values: Optional[List[List[torch.Tensor]]] = None
+        self.is_terminals: Optional[List[List[torch.Tensor]]] = None
 
     def clear(self):
-
-        del self.proposals[:]
-        del self.proposals_logprobs[:]
-        del self.promises[:]
-        del self.promises_logprobs[:]
-        del self.env_states[:]
-        del self.rewards[:]
-        del self.state_values[:]
-        del self.is_terminals[:]
+        self.__init__()
 
 
 class PPOProposals():
     def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, device: str):
         
-        with open('ppo_negotiation_simplified/proposals/params.yml') as f:
+        with open('proposals/params.yml') as f:
             self.params = yaml.load(f, Loader=yaml.FullLoader)
         self.device = device
         self.buffer = RolloutBuffer()
@@ -60,12 +52,30 @@ class PPOProposals():
 
         actions, state_val = self.policy_old.act(env_state)
 
-        self.buffer.    env_states.             extend(env_state)
-        self.buffer.    proposals.              extend(actions['proposals']['proposals'])
-        self.buffer.    proposals_logprobs.     extend(actions['proposals']['log_probs'])
-        self.buffer.    promises.               extend(actions['promises']['promises'])
-        self.buffer.    promises_logprobs.      extend(actions['promises']['log_probs'])
-        self.buffer.    state_values.           extend(state_val)    
+        batch_size_iter = range(len(env_state))
+        if self.buffer.env_states is None:
+            self.buffer.env_states = [[env_state[i]] for i in batch_size_iter]
+
+            self.buffer.proposals = [[actions['proposals']['proposals'][i]] for i in batch_size_iter]
+            self.buffer.proposals_logprobs = [[actions['proposals']['log_probs'][i]] for i in batch_size_iter]
+            
+            self.buffer.promises = [[actions['promises']['promises'][i]] for i in batch_size_iter]
+            self.buffer.promises_logprobs = [[actions['promises']['log_probs'][i]] for i in batch_size_iter]
+
+            self.buffer.state_values = [[state_val[i]] for i in batch_size_iter]
+            self.buffer.rewards = [[] for i in batch_size_iter]
+            self.buffer.is_terminals = [[] for i in batch_size_iter]
+        else:
+            for i in batch_size_iter:
+                self.buffer.env_states[i].append(env_state[i])
+
+                self.buffer.proposals[i].append(actions['proposals']['proposals'][i])
+                self.buffer.proposals_logprobs[i].append(actions['proposals']['log_probs'][i])
+
+                self.buffer.promises[i].append(actions['promises']['promises'][i])
+                self.buffer.promises_logprobs[i].append(actions['promises']['log_probs'][i])
+
+                self.buffer.state_values[i].append(state_val[i])
 
         return {
             'proposals' : [proposal.detach().cpu().numpy() for proposal in actions['proposals']['proposals']],
@@ -80,23 +90,27 @@ class PPOProposals():
         # Monte Carlo estimate of returns
         returns = []
         discounted_return = 0
-        for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
+        zipped = zip(
+            reversed(np.concatenate(list(map(np.stack, self.buffer.rewards)))), 
+            reversed(np.concatenate(list(map(np.stack, self.buffer.is_terminals))))
+        )
+        for reward, is_terminal in zipped:
             if is_terminal:
                 discounted_return = 0
             discounted_return = reward + self.params['gamma'] * discounted_return
             returns.insert(0, discounted_return)
 
         # Normalizing the rewards
-        returns = torch.tensor(self.buffer.rewards, dtype=torch.float32).to(self.device)
+        returns = torch.tensor(returns, dtype=torch.float32).to(self.device)
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
 
         # convert list to tensor
-        old_states                  = torch.stack(self.buffer.env_states)           .detach()
-        old_proposals               = torch.stack(self.buffer.proposals)            .detach()
-        old_proposals_logprobs      = torch.stack(self.buffer.proposals_logprobs)   .detach()
-        old_promises                = torch.stack(self.buffer.promises)             .detach()
-        old_promises_logprobs       = torch.stack(self.buffer.promises_logprobs)    .detach()
-        old_state_values            = torch.stack(self.buffer.state_values)         .detach()
+        old_states                = torch.cat(list(map(torch.stack, self.buffer.env_states))).detach()
+        old_proposals             = torch.cat(list(map(torch.stack, self.buffer.proposals))).detach()
+        old_proposals_logprobs    = torch.cat(list(map(torch.stack, self.buffer.proposals_logprobs))).detach()
+        old_promises              = torch.cat(list(map(torch.stack, self.buffer.promises))).detach()
+        old_promises_logprobs     = torch.cat(list(map(torch.stack, self.buffer.promises_logprobs))).detach()
+        old_state_values          = torch.cat(list(map(torch.stack, self.buffer.state_values))).detach()
 
         # calculate advantages
         advantages = (returns.detach() - old_state_values.squeeze()).unsqueeze(-1).unsqueeze(-1)
