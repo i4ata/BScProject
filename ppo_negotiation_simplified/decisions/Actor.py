@@ -27,4 +27,4 @@ class Actor(nn.Module):
         x = self.activation(self.input_layer(state))
         for layer in self.hidden_layers:
             x = self.activation(layer(x))
-        return torch.stack([head(x) for head in self.heads], dim = 1)
+        return torch.cat([head(x) for head in self.heads], dim = 1)

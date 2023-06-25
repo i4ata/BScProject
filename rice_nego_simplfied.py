@@ -166,49 +166,13 @@ class Rice:
         self.default_agent_action_mask = np.ones(self.len_actions, dtype=bool).reshape(-1, self.num_discrete_action_levels)
 
     def init_global_negotiation_state(self):
+        shape = (self.episode_length + 1, self.num_regions, *self.default_agent_action_mask.shape)
         self.global_negotiation_state = {
-            'action_masks' : np.ones((self.episode_length + 1, self.num_regions, *self.default_agent_action_mask.shape)),
-
-            'promises' : 
-            [
-                {
-                    sender : {
-                        receiver : np.copy(self.default_agent_action_mask)
-                        for receiver in range(self.num_regions)
-                        if receiver != sender
-                    }
-                    for sender in range(self.num_regions)
-                }
-                for timestep in range(self.episode_length + 1)
-            ],
-
-            'proposals' : 
-            [
-                {
-                    sender : {
-                        receiver : np.copy(self.default_agent_action_mask)
-                        for receiver in range(self.num_regions)
-                        if receiver != sender
-                    }
-                    for sender in range(self.num_regions)
-                }
-                for timestep in range(self.episode_length + 1)
-            ],
-
-            'decisions' : 
-            [
-                {
-                    sender : {
-                        receiver : np.zeros(1, dtype=self.int_dtype)
-                        for receiver in range(self.num_regions)
-                        if receiver != sender
-                    }
-                    for sender in range(self.num_regions)
-                }
-                for timestep in range(self.episode_length + 1)
-            ],
-
-            'rewards' : np.zeros((self.episode_length + 1, self.num_regions))
+            'action_masks' : np.ones(shape, dtype = bool),
+            'promises' : np.ones(shape, dtype = bool),
+            'proposals' : np.ones(shape, dtype = bool),
+            'decisions' : np.zeros(shape[:2], dtype = bool),
+            'rewards' : np.zeros(shape[:2], dtype = self.float_dtype)
         }
 
     def reset(self):
@@ -419,56 +383,39 @@ class Rice:
 
         return self.climate_and_economy_simulation_step(actions)
 
-    def register_decisions(self, decisions: List[np.ndarray]):
+    def register_decisions(self, decisions: List[bool]):
 
         reached_agreement = -1
         # Register decisions into environment
         for agent in range(self.num_regions):
 
-            i = 0
-            for other in range(self.num_regions):
+            self.global_negotiation_state['decisions'][self.timestep, agent] = decisions[agent]
 
-                if agent == other:
-                    continue
+            if decisions[agent]:
 
-                decision = decisions[agent][i].astype(bool)
-                self.global_negotiation_state['decisions'][self.timestep][agent][other] = decision
-
-                if decision:
-
-                    reached_agreement = 1
-                    # Update masks
-                    # Accept proposal
-                    self.global_negotiation_state['action_masks'][self.timestep][agent] = np.logical_and(
-                        self.global_negotiation_state['proposals'][self.timestep][other][agent],
-                        self.global_negotiation_state['action_masks'][self.timestep][agent]
-                    )
-                    
-                    # Keep the promise
-                    self.global_negotiation_state['action_masks'][self.timestep][other] = np.logical_and(
-                        self.global_negotiation_state['promises'][self.timestep][other][agent],
-                        self.global_negotiation_state['action_masks'][self.timestep][other]
-                    )
-
-                i += 1
+                reached_agreement = 1
+                # Update masks
+                # Accept proposal
+                self.global_negotiation_state['action_masks'][self.timestep, agent] &= \
+                    self.global_negotiation_state['proposals'][self.timestep, 1 - agent]
+                
+                # Keep the promise
+                self.global_negotiation_state['action_masks'][self.timestep, 1 - agent] &= \
+                    self.global_negotiation_state['promises'][self.timestep, 1 - agent]
 
         self.global_negotiation_state['rewards'][self.timestep] = [reached_agreement] * self.num_regions
-
 
         return self.generate_observation()
 
     def register_proposals(self, proposals: List[Dict[str, np.ndarray]]):
 
         for agent in range(self.num_regions):
-            keys = list(range(self.num_regions))
-            keys.remove(agent)
-            pps = {i : proposal.reshape(-1, self.num_discrete_action_levels).astype(bool) 
-                   for (i, proposal) in zip(keys, proposals[agent]['proposals'])}
-            pms = {i : promise.reshape(-1, self.num_discrete_action_levels).astype(bool) 
-                   for (i, promise) in zip(keys, proposals[agent]['promises'])}
 
-            self.global_negotiation_state['proposals'][self.timestep][agent] = pps
-            self.global_negotiation_state['promises'][self.timestep][agent] = pms
+            self.global_negotiation_state['proposals'][self.timestep, agent] = \
+                proposals[agent]['proposals'].reshape(-1, self.num_discrete_action_levels).astype(bool)
+            
+            self.global_negotiation_state['promises'][self.timestep, agent] = \
+                proposals[agent]['promises'].reshape(-1, self.num_discrete_action_levels).astype(bool)
             
         return self.generate_observation()
                 
@@ -515,17 +462,11 @@ class Rice:
         for region_id in range(self.num_regions):
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
-                _ACTION_MASK: self.global_negotiation_state['action_masks'][self.timestep][region_id],
-                _PROMISES: np.stack([
-                    self.global_negotiation_state['promises'][self.timestep][sender_id][region_id]
-                    for sender_id in range(self.num_regions)
-                    if sender_id != region_id
-                ]),
-                _PROPOSALS: np.stack([
-                    self.global_negotiation_state['proposals'][self.timestep][sender_id][region_id]
-                    for sender_id in range(self.num_regions)
-                    if sender_id != region_id
-                ])
+                _ACTION_MASK: self.global_negotiation_state['action_masks'][self.timestep, region_id],
+                _PROMISES: self.global_negotiation_state['promises'][self.timestep, 1 - region_id],
+                _PROPOSALS: self.global_negotiation_state['proposals'][self.timestep, 1 - region_id],
+                'own_promises': self.global_negotiation_state['promises'][self.timestep, region_id],
+                'own_proposals': self.global_negotiation_state['proposals'][self.timestep, region_id]
             }
 
         return obs_dict
@@ -1047,7 +988,7 @@ class Rice:
         return obs, rew, done, info
 
     def estimate_reward_distribution(self, n_trials: int = 1_000):
-        rewards: np.ndarray = np.zeros((self.episode_length * n_trials, self.num_regions))
+        rewards: np.ndarray = np.zeros((self.episode_length * n_trials, self.num_regions), dtype=self.float_dtype)
         for trial in tqdm(range(n_trials)):
             state = self.reset()
             for step in range(self.episode_length):
@@ -1060,7 +1001,7 @@ class Rice:
 
                 # Save the reward
                 rewards[trial * self.episode_length + step] = list(reward.values())
-    
+
         return rewards.mean(0)  
 
     def random_run(self) -> None:

@@ -17,7 +17,7 @@ class DecisionNet(nn.Module):
 
         super(DecisionNet, self).__init__()
 
-        self.state_space = 2 * (n_agents - 1) * action_space.nvec.sum() + state_space
+        self.state_space = 4 * (n_agents - 1) * action_space.nvec.sum() + state_space
         self.action_space = 1
 
         self.actor = Actor(self.state_space, n_agents, params['actor'])
@@ -44,18 +44,12 @@ class DecisionNet(nn.Module):
 
         return log_probs, entropies, state_value
     
-    def act_deterministically(self, env_state: torch.Tensor) -> np.ndarray:
-        with torch.no_grad():
+    def eval_act(self, env_state: torch.Tensor, deterministic = False) -> np.ndarray:
 
-            decision_probs: torch.Tensor = self.actor(env_state)
-            decisions = ((decision_probs > .5) * 1).cpu().numpy()
-        
-        return decisions
-    
-    def act_stochastically(self, env_state: torch.Tensor) -> np.ndarray:
         with torch.no_grad():
-            
             decision_probs: torch.Tensor = self.actor(env_state)
-            decisions = ((torch.rand_like(decision_probs) < decision_probs) * 1).cpu().numpy()
-            
-        return decisions
+            if deterministic:
+                decisions = (decision_probs > .5) * 1
+            else:
+                decisions = (torch.rand_like(decision_probs) < decision_probs) * 1
+            return decisions.cpu().numpy()

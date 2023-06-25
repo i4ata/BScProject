@@ -33,7 +33,9 @@ class Agent():
             np.concatenate([
                 state['features'], 
                 state['promises'].flatten(),
-                state['proposals'].flatten()
+                state['proposals'].flatten(),
+                state['own_promises'].flatten(),
+                state['own_proposals'].flatten()
             ]) 
             for state in states
         ])).to(self.device)
@@ -58,16 +60,19 @@ class Agent():
         negotiation_state = torch.FloatTensor(np.concatenate([
             state['features'], 
             state['promises'].flatten(),
-            state['proposals'].flatten()])
-        ).unsqueeze(0).to(self.device)
-        actions = self.decision_net.policy.act_stochastically(negotiation_state)
+            state['proposals'].flatten(),
+            state['own_promises'].flatten(),
+            state['own_proposals'].flatten()
+        ])).unsqueeze(0).to(self.device)
+        
+        actions = self.decision_net.policy.eval_act(negotiation_state, deterministic)
 
         return actions
 
     def eval_make_proposals(self, state: Dict[str, np.ndarray], deterministic = False) -> Dict[str, np.ndarray]:
 
         negotiation_state = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
-        actions = self.proposal_net.policy.act_stochastically(negotiation_state)
+        actions = self.proposal_net.policy.eval_act(negotiation_state, deterministic)
         
         return actions
     
@@ -75,6 +80,6 @@ class Agent():
 
         features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
         action_mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
-        actions = self.activity_net.policy.act_stochastically(features, action_mask)
+        actions = self.activity_net.policy.eval_act(features, action_mask, deterministic)
 
         return actions

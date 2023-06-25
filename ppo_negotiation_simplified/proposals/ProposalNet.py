@@ -29,12 +29,11 @@ class ProposalNet(nn.Module):
 
             proposal_probs, promise_probs = self.actor(env_state)
             state_value: torch.Tensor = self.critic(env_state)
-
             proposals = (torch.rand_like(proposal_probs) < proposal_probs) * 1
             promises  = (torch.rand_like(promise_probs) < promise_probs ) * 1
 
             log_probs_proposals = torch.log(torch.abs(proposals - proposal_probs))
-            log_probs_promise   = torch.log(torch.abs(promises  - promise_probs))
+            log_probs_promises = torch.log(torch.abs(promises - promise_probs))
             
             return_dict = {
                 'proposals' : {
@@ -43,7 +42,7 @@ class ProposalNet(nn.Module):
                 },
                 'promises' : {
                     'promises' : promises,
-                    'log_probs' : log_probs_promise
+                    'log_probs' : log_probs_promises
                 }
             }
 
@@ -75,23 +74,15 @@ class ProposalNet(nn.Module):
         }
 
         return return_dict, state_value
-    
-    def act_deterministically(self, env_state: torch.Tensor) -> Dict[str, np.ndarray]:
+
+    def eval_act(self, env_state: torch.Tensor, deterministic = False) -> Dict[str, np.ndarray]:
         with torch.no_grad():
-            
             proposal_probs, promise_probs = self.actor(env_state)
             
-            proposals = ((proposal_probs > .5) * 1).detach().cpu().numpy()
-            promises = ((promise_probs > .5) * 1).detach().cpu().numpy()
-
-        return {'proposals' : proposals, 'promises' : promises}
-    
-    def act_stochastically(self, env_state: torch.Tensor) -> Dict[str, np.ndarray]:
-        with torch.no_grad():
-            
-            proposal_probs, promise_probs = self.actor(env_state)
-
-            proposals = ((torch.rand_like(proposal_probs) < proposal_probs) * 1).detach().cpu().numpy()
-            promises = ((torch.rand_like(promise_probs) < promise_probs) * 1).detach().cpu().numpy()
-
-        return {'proposals' : proposals, 'promises' : promises}
+            if deterministic:
+                proposals = (proposal_probs > .5) * 1
+                promises = (promise_probs > .5) * 1
+            else:
+                proposals = (torch.rand_like(proposal_probs) < proposal_probs) * 1
+                promises = (torch.rand_like(promise_probs) < promise_probs) * 1
+        return {'proposals': proposals.detach().cpu().numpy(), 'promises': promises.detach().cpu().numpy()}

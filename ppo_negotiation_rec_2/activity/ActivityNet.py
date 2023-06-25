@@ -3,13 +3,12 @@ import torch.nn as nn
 from torch.distributions import Categorical
 import numpy as np
 
-from Actor import Actor
-from Critic import Critic
+from activity.Actor import Actor
+from activity.Critic import Critic
 
-import sys
 from gym.spaces import MultiDiscrete
 
-from typing import Tuple, List
+from typing import Tuple
 
 class ActivityNet(nn.Module):
     def __init__(self, state_space: int, action_space : MultiDiscrete, params : dict = None):
@@ -18,17 +17,17 @@ class ActivityNet(nn.Module):
         self.actor = Actor(state_space, action_space, params['actor'])
         self.critic = Critic(state_space, action_space, params['critic'])
         
-    def act_deterministically(self, env_state: torch.Tensor, action_mask: torch.Tensor) -> np.ndarray:
+    def eval_act(self, env_state: torch.Tensor, action_mask: torch.Tensor, deterministic = False) -> np.ndarray:
         with torch.no_grad():
             action_logits = self.actor(env_state, action_mask)
-        return torch.stack(list(map(torch.argmax, action_logits))).detach().cpu().numpy()
-    
-    def act_stochastically(self, env_state: torch.Tensor, action_mask: torch.Tensor) -> np.ndarray:
-        with torch.no_grad():
-            action_logits = self.actor(env_state, action_mask)
-            distributions = [Categorical(logits = logits) for logits in action_logits]
-        return torch.cat([d.sample() for d in distributions]).detach().cpu().numpy()
+            if deterministic:
+                actions = torch.stack(list(map(torch.argmax, action_logits)))
+            else:
+                distributions = [Categorical(logits=logits) for logits in action_logits]
+                actions = torch.cat([d.sample() for d in distributions])
 
+        return actions.detach().cpu().numpy()
+    
     def act(self, env_state: torch.Tensor, action_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         with torch.no_grad():
 

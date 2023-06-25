@@ -47,11 +47,11 @@ def decisions_step(agents: List[Agent],
                    states: List[Dict[str, np.ndarray]]) -> List[Dict[str, np.ndarray]]:
 
     # Get actions in the shape [agent_id, env_id, decision]
-    actions = [agent.make_decisions([state[agent.id] for state in states]) for agent in agents]
+    actions = [agent.make_decisions([state[i] for state in states]) for i, agent in enumerate(agents)]
     
     # Transform actions to [env_id, {agent_id : decision}]
     actions = [
-        [actions[agent_id][env_id] for agent_id in range(len(agents))]
+        np.concatenate([actions[agent_id][env_id] for agent_id in range(len(agents))])
         for env_id in range(len(envs))
     ]
     
@@ -96,7 +96,6 @@ def give_rewards(agents: List[Agent],
                 agent.proposal_net.buffer.is_terminals[j].extend(is_terminals)
                 agent.decision_net.buffer.is_terminals[j].extend(is_terminals)
 
-
 def train(agents: List[Agent], 
           envs: List[Rice], 
           epochs: int = 70, 
@@ -128,13 +127,9 @@ def train(agents: List[Agent],
 
     return eval_rewards
         
+def random_runs(env: Rice, n_trials: int = 20):
 
-def random_runs(env: Rice, n_trials: int = 10):
-    ret = []
-    for trial in range(n_trials):
-        env.random_run()
-        ret.append(env.global_state)
-    return ret
+    return eval_agents(create_agents(env), env, communication_on=False, n_trials=n_trials)
 
 def eval_agents(agents: List[Agent], env: Rice, communication_on: bool = True, n_trials: int = 20) -> np.ndarray:
 
@@ -161,3 +156,17 @@ def eval_agents(agents: List[Agent], env: Rice, communication_on: bool = True, n
             env_rewards[trial, step] = list(reward.values())
 
     return env_rewards.mean((0, 1))
+
+def eval_deterministic(agents: List[Agent], env: Rice, communication_on: bool = True) -> np.ndarray:
+    
+    state = env.reset()
+    for step in range(env.episode_length):
+        if communication_on:
+            proposals = [agent.eval_make_proposals(state[i], deterministic=True) for i, agent in enumerate(agents)]
+            state = env.register_proposals(proposals)
+
+            decisions = [agent.eval_make_decisions(state[i], deterministic=True) for i, agent in enumerate(agents)]
+            state = env.register_decisions(decisions)
+        actions = {i: agent.eval_act(state[i]) for i, agent in enumerate(agents)}
+        state, _, _, _ = env.step(actions)
+    return env.global_state['reward_all_regions']['value'][1:].mean(0)

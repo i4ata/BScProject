@@ -38,7 +38,7 @@ class Actor(nn.Module):
             for head in self.heads]
         )
 
-        proposal_probs = torch.stack(proposal_probs, dim = 1)
-        promise_probs  = torch.stack(promise_probs,  dim = 1)
+        proposal_probs = torch.cat(proposal_probs, dim = 1)
+        promise_probs  = torch.cat(promise_probs,  dim = 1)
 
         return proposal_probs, promise_probs

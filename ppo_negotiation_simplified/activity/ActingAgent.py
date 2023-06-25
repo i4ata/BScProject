@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from PPOActivity import PPOActivity
+from activity.PPOActivity import PPOActivity
 from gym.spaces import MultiDiscrete
 
 from typing import Dict, List
@@ -28,11 +28,10 @@ class Agent():
     def update(self):
         self.ppo.update()
 
-    def eval(self, state: Dict[str, np.ndarray], deterministic = True) -> np.ndarray:
+    def eval_act(self, state: Dict[str, np.ndarray], deterministic = False) -> np.ndarray:
 
         features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
         mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
 
-        actions = self.ppo.policy.act_deterministically(features, mask) if deterministic else \
-                  self.ppo.policy.act_stochastically(features, mask)
+        actions = self.ppo.policy.eval_act(features, mask, deterministic)
         return actions

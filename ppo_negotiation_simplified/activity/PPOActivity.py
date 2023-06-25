@@ -7,7 +7,6 @@ from activity.ActivityNet import ActivityNet
 
 from typing import List, Optional
 import yaml
-import os
 
 class RolloutBuffer:
     def __init__(self):

@@ -10,15 +10,25 @@ class Critic(nn.Module):
 
         self.hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
 
-        self.fc1 = nn.Linear(state_space, 64)
+        self.input_layer = nn.Linear(state_space, 64)
         self.lstm = nn.LSTMCell(64, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, 1)
-        self.activation = nn.ReLU()
+        
+        self.hidden_layers = nn.ModuleList([
+            nn.Linear(64, 64)
+            for i in range(3)
+        ])
+        
+        self.activation = nn.Tanh()
+        self.output_layer = nn.Linear(64, 1)
     
     def forward(self, 
                 state: torch.Tensor, 
                 hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None) -> torch.Tensor:
         
-        self.hidden_state = self.lstm(self.fc1(state), hidden_state if hidden_state else self.hidden_state) 
-        return self.fc3(self.activation(self.fc2(self.hidden_state[0])))
+        self.hidden_state = self.lstm(self.input_layer(state), hidden_state if hidden_state else self.hidden_state) 
+        x = self.hidden_state[0]
+        
+        for layer in self.hidden_layers:
+            x = self.activation(layer(x))
+
+        return self.output_layer(x)

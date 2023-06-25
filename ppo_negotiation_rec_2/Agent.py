@@ -1,13 +1,6 @@
-from negotiation.decisions.PPODecisions import PPODecisions
-from negotiation.decisions.DecisionNet import DecisionNet
-
-from negotiation.proposals.PPOProposals import PPOProposals
-from negotiation.proposals.ProposalNet import ProposalNet
-
+from decisions.PPODecisions import PPODecisions
+from proposals.PPOProposals import PPOProposals
 from activity.PPOActivity import PPOActivity
-from activity.ActivityNet import ActivityNet
-
-from Interfaces import PPO
 
 import torch
 import numpy as np
@@ -21,122 +14,83 @@ from gym.spaces import MultiDiscrete
 class Agent():
     
     def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, id : int, device : str = 'cpu'):
-        self.nets: Dict[str, PPO] = {
-            'activityNet' : PPOActivity(
-                model = ActivityNet(state_space, action_space), 
-                params = None, device = device
-            ),
-            'proposalNet' : PPOProposals(
-                model = ProposalNet(state_space, action_space, n_agents), 
-                params = None, device = device
-            ),
-            'decisionNet' : PPODecisions(
-                model = DecisionNet(state_space, action_space, n_agents),
-                params = None, device = device
-            )
-        }
-
+        
+        self.activity_net = PPOActivity(state_space, action_space, device=device)
+        self.proposal_net = PPOProposals(state_space, action_space, n_agents, device=device)
+        self.decision_net = PPODecisions(state_space, action_space, n_agents, device=device)
+        
         self.device = device
         self.id = id
 
     def make_proposals(self, states: List[Dict[str, np.ndarray]]) -> Dict[str, List[np.ndarray]]:
 
-        # Create a 2D tensor of the features only [batch_size, features]
-        # Pass it to the proposal network and receive the promises and proposals
-        features = torch.FloatTensor(np.stack([
-            np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten()))
-            for state in states
-        ])).to(self.device)
-        
-        return self.nets['proposalNet'].select_action(features)
+        negotiation_state = torch.FloatTensor(np.stack([state['features'] for state in states])).to(self.device)
+        return self.proposal_net.select_action(negotiation_state)
     
     def make_decisions(self, states: List[Dict[str, np.ndarray]]) -> Dict[str, List[np.ndarray]]:
         
-        features = torch.FloatTensor(np.stack([
-            np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten())) 
+        negotiation_state = torch.FloatTensor(np.stack([
+            np.concatenate([
+                state['features'], 
+                state['promises'].flatten(),
+                state['proposals'].flatten(),
+                state['own_promises'].flatten(),
+                state['own_proposals'].flatten()
+            ]) 
             for state in states
         ])).to(self.device)
-        promises = torch.FloatTensor(np.stack([
-            state['promises'].flatten()
-            for state in states
-        ])).to(self.device)
-        proposals = torch.FloatTensor(np.stack([
-            state['proposals'].flatten()
-            for state in states
-        ])).to(self.device)
-
-        return self.nets['decisionNet'].select_action(
-            features,
-            proposals = proposals,
-            promises = promises
-        )
+        
+        return self.decision_net.select_action(negotiation_state)
 
     def act(self, states : List[Dict[str, np.ndarray]]) -> List[np.ndarray]:
 
         features = torch.FloatTensor(np.stack([state['features'] for state in states])).to(self.device)
-        
         action_mask = torch.FloatTensor(np.stack([state['action_mask'].flatten() for state in states])).to(self.device)
         
-        return self.nets['activityNet'].select_action(
-            env_state = features,
-            action_mask = action_mask,
-        )
+        return self.activity_net.select_action(features, action_mask)
 
     def update(self, nego_on = True) -> None:
+        self.activity_net.update()
         if nego_on:
-            for net in self.nets:
-                self.nets[net].update()
-        else:
-            self.nets['activityNet'].update()
+            self.proposal_net.update()
+            self.decision_net.update()
 
     def eval_make_decisions(self, state: Dict[str, np.ndarray], deterministic = False) -> np.ndarray:
 
-        features = torch.FloatTensor(
-            np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten()))
-        ).unsqueeze(0).to(self.device)
+        negotiation_state = torch.FloatTensor(np.concatenate([
+            state['features'], 
+            state['promises'].flatten(),
+            state['proposals'].flatten(),
+            state['own_promises'].flatten(),
+            state['own_proposals'].flatten()
+        ])).unsqueeze(0).to(self.device)
+        
+        actions = self.decision_net.policy.eval_act(negotiation_state, deterministic)
 
-        promises = torch.FloatTensor(state['promises'].flatten()).unsqueeze(0).to(self.device)
-        proposals = torch.FloatTensor(state['proposals'].flatten()).unsqueeze(0).to(self.device)
-
-        kwargs = {'env_state' : features, 'promises' : promises, 'proposals' : proposals}
-
-        actions = self.nets['decisionNet'].policy.act_deterministically(**kwargs) if deterministic else \
-                  self.nets['decisionNet'].policy.act_stochastically(**kwargs)
-    
         return actions
 
     def eval_make_proposals(self, state: Dict[str, np.ndarray], deterministic = False) -> Dict[str, np.ndarray]:
 
-        features = torch.FloatTensor(
-            np.concatenate((state['features'], state['negotiation_status'], state['action_mask'].flatten()))
-        ).unsqueeze(0).to(self.device)
-
-
-        actions = self.nets['proposalNet'].policy.act_deterministically(features) if deterministic else \
-                  self.nets['proposalNet'].policy.act_stochastically(features)
-    
+        negotiation_state = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
+        actions = self.proposal_net.policy.eval_act(negotiation_state, deterministic)
+        
         return actions
     
     def eval_act(self, state: Dict[str, np.ndarray], deterministic = False) -> np.ndarray:
+
         features = torch.FloatTensor(state['features']).unsqueeze(0).to(self.device)
         action_mask = torch.FloatTensor(state['action_mask'].flatten()).unsqueeze(0).to(self.device)
-
-        actions = self.nets['activityNet'].policy.act_deterministically(
-            env_state = features,
-            action_mask = action_mask
-        ) if deterministic else self.nets['activityNet'].policy.act_stochastically(
-            env_state = features,
-            action_mask = action_mask
-        )
+        actions = self.activity_net.policy.eval_act(features, action_mask, deterministic)
 
         return actions
+    
+    def reset_hs(self):
+        self.proposal_net.policy.actor.hidden_state = None
+        self.proposal_net.policy.critic.hidden_state = None
+        self.proposal_net.policy_old.actor.hidden_state = None
+        self.proposal_net.policy_old.critic.hidden_state = None
 
-    def reset_negotiation_hs(self):
-        
-        for net in ('proposalNet', 'decisionNet'):
-
-            self.nets[net].policy_old.actor.hidden_state = None
-            self.nets[net].policy_old.critic.hidden_state = None
-
-            self.nets[net].policy.actor.hidden_state = None
-            self.nets[net].policy.critic.hidden_state = None
+        self.decision_net.policy.actor.hidden_state = None
+        self.decision_net.policy.critic.hidden_state = None
+        self.decision_net.policy_old.actor.hidden_state = None
+        self.decision_net.policy_old.critic.hidden_state = None
