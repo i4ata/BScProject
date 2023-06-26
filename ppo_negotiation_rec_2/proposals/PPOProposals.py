@@ -52,8 +52,8 @@ class PPOProposals:
 
         actions, state_val = self.policy_old.act(env_state)
 
-        hs_actor = zip(*self.policy_old.actor.hidden_state)
-        hs_critic = zip(*self.policy_old.critic.hidden_state)
+        hs_actor = list(zip(*self.policy_old.actor.hidden_state))
+        hs_critic = list(zip(*self.policy_old.critic.hidden_state))
         batch_size_iter = range(len(env_state))
 
         if self.buffer.env_states is None:
@@ -173,5 +173,6 @@ class PPOProposals:
         self.buffer.clear()
 
     def to_tuple(self, xs: List[List[Tuple[torch.Tensor, torch.Tensor]]]) -> Tuple[torch.Tensor, torch.Tensor]:
-        return (torch.cat(list(map(torch.stack, [x[0] for x in xs]))).detach(), \
-                torch.cat(list(map(torch.stack, [x[1] for x in xs]))).detach())
+        hidden_states = [item for sublist in xs for item in sublist]
+        return torch.stack([hs[0] for hs in hidden_states]).detach(), \
+               torch.stack([hs[1] for hs in hidden_states]).detach()

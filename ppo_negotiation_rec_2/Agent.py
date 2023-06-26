@@ -13,11 +13,11 @@ from gym.spaces import MultiDiscrete
 
 class Agent():
     
-    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, id : int, device : str = 'cpu'):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, id : int, device : str = 'cpu'):
         
         self.activity_net = PPOActivity(state_space, action_space, device=device)
-        self.proposal_net = PPOProposals(state_space, action_space, n_agents, device=device)
-        self.decision_net = PPODecisions(state_space, action_space, n_agents, device=device)
+        self.proposal_net = PPOProposals(state_space, action_space, device=device)
+        self.decision_net = PPODecisions(state_space, action_space, device=device)
         
         self.device = device
         self.id = id

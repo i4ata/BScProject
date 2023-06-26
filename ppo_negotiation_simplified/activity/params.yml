@@ -16,9 +16,9 @@ ppo:
   policy:
     
     actor:
-      n_hidden_layers_actor: 3
-      hidden_size_actor: 64
+      n_hidden_layers_actor: 0 #3
+      hidden_size_actor: 16 #64
     
     critic:
-      n_hidden_layers_critic: 3
-      hidden_size_critic: 64
+      n_hidden_layers_critic: 0 #3
+      hidden_size_critic: 16 #64

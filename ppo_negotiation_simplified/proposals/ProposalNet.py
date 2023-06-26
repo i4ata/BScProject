@@ -13,14 +13,14 @@ from typing import Tuple, Dict
 
 class ProposalNet(nn.Module):
     
-    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, params: dict):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, params: dict):
 
         super(ProposalNet, self).__init__()
 
         self.state_space = state_space
         self.action_space = action_space.nvec.sum()
 
-        self.actor = Actor(self.state_space, self.action_space, n_agents, params['actor'])
+        self.actor = Actor(self.state_space, self.action_space, params['actor'])
         self.critic = Critic(self.state_space, params['critic'])
 
     def act(self, env_state : torch.Tensor) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
@@ -29,11 +29,11 @@ class ProposalNet(nn.Module):
 
             proposal_probs, promise_probs = self.actor(env_state)
             state_value: torch.Tensor = self.critic(env_state)
-            proposals = (torch.rand_like(proposal_probs) < proposal_probs) * 1
-            promises  = (torch.rand_like(promise_probs) < promise_probs ) * 1
+            proposals = torch.bernoulli(proposal_probs)
+            promises  = torch.bernoulli(promise_probs)
 
-            log_probs_proposals = torch.log(torch.abs(proposals - proposal_probs))
-            log_probs_promises = torch.log(torch.abs(promises - promise_probs))
+            log_probs_proposals = torch.log(proposals * proposal_probs + (1 - proposals) * (1 - proposal_probs))
+            log_probs_promises = torch.log(promises * promise_probs + (1 - promises) * (1 - promise_probs))
             
             return_dict = {
                 'proposals' : {
@@ -56,8 +56,8 @@ class ProposalNet(nn.Module):
         proposal_probs, promise_probs = self.actor(env_state)
         state_value = self.critic(env_state)
 
-        proposal_log_probs = torch.log(torch.abs(proposals - proposal_probs))
-        promise_log_probs = torch.log(torch.abs(promises - promise_probs))
+        proposal_log_probs = torch.log(proposals * proposal_probs + (1 - proposals) * (1 - proposal_probs))
+        promise_log_probs = torch.log(promises * promise_probs + (1 - promises) * (1 - promise_probs))
 
         proposal_entropies = - proposal_probs * torch.log2(proposal_probs) - (1 - proposal_probs) * torch.log2(1 - proposal_probs)
         promise_entropies = - promise_probs * torch.log2(promise_probs) - (1 - promise_probs) * torch.log2(1 - promise_probs)
@@ -80,9 +80,9 @@ class ProposalNet(nn.Module):
             proposal_probs, promise_probs = self.actor(env_state)
             
             if deterministic:
-                proposals = (proposal_probs > .5) * 1
-                promises = (promise_probs > .5) * 1
+                proposals = torch.round(proposal_probs)
+                promises = torch.round(promise_probs)
             else:
-                proposals = (torch.rand_like(proposal_probs) < proposal_probs) * 1
-                promises = (torch.rand_like(promise_probs) < promise_probs) * 1
+                proposals = torch.bernoulli(proposal_probs)
+                promises = torch.bernoulli(promise_probs)
         return {'proposals': proposals.detach().cpu().numpy(), 'promises': promises.detach().cpu().numpy()}

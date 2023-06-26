@@ -3,25 +3,25 @@ import torch.nn as nn
 from typing import Tuple, Optional
 
 class Actor(nn.Module):
-    def __init__(self, state_space, action_space):
+    def __init__(self, state_space: int, action_space: int, params: dict):
         super().__init__()
 
         self.hidden_state = None
 
-        self.input_layer = nn.Linear(state_space, 64)
-        self.lstm = nn.LSTMCell(64, 64)
+        self.input_layer = nn.Linear(state_space, params['hidden_size_actor'])
+        self.lstm = nn.LSTMCell(params['hidden_size_actor'], params['hidden_size_actor'])
         
         self.hidden_layers = nn.ModuleList([
-            nn.Linear(64, 64)
-            for i in range(3)
+            nn.Linear(params['hidden_size_actor'], params['hidden_size_actor'])
+            for i in range(params['n_hidden_layers_actor'])
         ])
 
         self.sigmoid = nn.Sigmoid()
         self.activation = nn.Tanh()
 
         self.output_layer = nn.ModuleDict({
-            'proposal' : nn.Linear(64, action_space),
-            'promise' : nn.Linear(64, action_space)
+            'proposal' : nn.Linear(params['hidden_size_actor'], action_space),
+            'promise' : nn.Linear(params['hidden_size_actor'], action_space)
         })
 
     def forward(self, state : torch.Tensor, 
@@ -35,8 +35,5 @@ class Actor(nn.Module):
 
         proposal_probs = self.sigmoid(self.output_layer['proposal'](x))
         promise_probs = self.sigmoid(self.output_layer['promise'](x))
-
-        proposal_probs = torch.cat(proposal_probs, dim = 1)
-        promise_probs  = torch.cat(promise_probs,  dim = 1)
 
         return proposal_probs, promise_probs

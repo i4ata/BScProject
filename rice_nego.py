@@ -177,9 +177,7 @@ class Rice:
             'negotiation_status' : np.zeros(shape[:2], dtype=bool),
             'promises' : np.ones(shape, dtype=bool),
             'proposals' : np.ones(shape, dtype=bool),
-            'decisions' : np.ones(shape[:3], dtype=bool),
-            'rewards_proposals' : np.zeros(shape[:3], dtype=self.float_dtype),
-            'rewards_decisions' : np.zeros(shape[:3], dtype=self.float_dtype)
+            'decisions' : np.ones(shape[:3], dtype=bool)
         }
 
     def reset(self):
@@ -392,13 +390,18 @@ class Rice:
 
         return self.climate_and_economy_simulation_step(actions)
 
-    def register_decisions(self, decisions: List[bool]):
-
-        if self.global_negotiation_state[n_s][t, n_t]:
-            self.negotiation_step += 1
-            return self.generate_observation()
+    def register_decisions(self, decisions: List[bool]) -> Dict[str, np.ndarray]:
 
         t, n_t, d, n_s = self.timestep, self.negotiation_step, 'decisions', 'negotiation_status'
+
+        if self.global_negotiation_state[n_s][t, n_t]:
+            new_states = self.generate_observation()
+            self.negotiation_step += 1
+            return new_states
+
+        proposal_rewards = np.zeros(self.num_regions)
+        decision_rewards = np.zeros(self.num_regions)
+
         reached_agreement = False
         # Register decisions into environment
         for agent in range(self.num_regions):
@@ -407,6 +410,8 @@ class Rice:
 
             if decisions[agent]:
                 reached_agreement = True
+
+                self.global_negotiation_state[n_s][t, n_t] = True
 
                 # Update masks
                 # Accept proposal
@@ -418,29 +423,28 @@ class Rice:
                     self.global_negotiation_state['promises'][t, n_t, 1 - agent]
 
                 # If the agent accepts the others' proposal, then the other had a good proposal
-                self.global_negotiation_state['rewards_proposals'][t, n_t, 1 - agent] += 1
-                self.global_negotiation_state['rewards_decisions'][t, n_t, agent] += 1
+                proposal_rewards[1 - agent] += 1
+                decision_rewards[agent] += 1
 
         # Punish the agents a bit if they never reached agreement
         if n_t == self.max_negotiation_steps - 1 and not reached_agreement:
             for agent in range(self.num_regions):
 
-                self.global_negotiation_state['rewards_proposals'][t][n_t][agent] -= 1
-                self.global_negotiation_state['rewards_decisions'][t][n_t][agent] -= 1
+                proposal_rewards[agent] -= 1
+                decision_rewards[agent] -= 1
 
         new_states = self.generate_observation()
         self.negotiation_step += 1
-        return new_states
+        return new_states #, {'proposals' : proposal_rewards, 'decisions' : decision_rewards}
 
-    def register_proposals(self, proposals: List[Dict[str, np.ndarray]]):
+    def register_proposals(self, proposals: List[Dict[str, np.ndarray]]) -> Dict[str, np.ndarray]:
 
         t, n_t, n_s = self.timestep, self.negotiation_step, 'negotiation_status'
         pp, pm = 'proposals', 'promises'
 
         if n_t:
             for c in self.global_negotiation_state:
-                if not c.startswith('rewards'):
-                    self.global_negotiation_state[c][t, n_t] = self.global_negotiation_state[c][t, n_t - 1]
+                self.global_negotiation_state[c][t, n_t] = self.global_negotiation_state[c][t, n_t - 1]
 
         if self.global_negotiation_state[n_s][t, n_t]:
             return self.generate_observation()

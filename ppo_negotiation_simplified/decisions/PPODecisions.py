@@ -25,21 +25,21 @@ class RolloutBuffer:
 
 
 class PPODecisions():
-    def __init__(self, state_space: int, action_space: MultiDiscrete, n_agents: int, device: str):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, device: str):
         
         with open('decisions/params.yml') as f:
             self.params = yaml.load(f, Loader=yaml.FullLoader)
         self.device = device
         self.buffer = RolloutBuffer()
 
-        self.policy = DecisionNet(state_space, action_space, n_agents, self.params['policy']).to(device)
+        self.policy = DecisionNet(state_space, action_space, self.params['policy']).to(device)
         
         self.optimizer = torch.optim.Adam([
                         {'params': self.policy.actor.parameters(), 'lr': self.params['lr_actor']},
                         {'params': self.policy.critic.parameters(), 'lr': self.params['lr_critic']}
                     ])
 
-        self.policy_old = DecisionNet(state_space, action_space, n_agents, self.params['policy']).to(device)
+        self.policy_old = DecisionNet(state_space, action_space, self.params['policy']).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.MseLoss = nn.MSELoss()
 

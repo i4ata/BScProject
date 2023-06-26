@@ -33,8 +33,8 @@ class ActivityNet(nn.Module):
         with torch.no_grad():
 
             action_logits = self.actor(env_state, action_mask)
-            # state_values = self.critic(env_state, action_mask)
-            state_values = self.critic(env_state)
+            state_values = self.critic(env_state, action_mask)
+            # state_values = self.critic(env_state)
 
             distributions = [Categorical(logits = logits) for logits in action_logits]
             actions = torch.stack([dist.sample().detach() for dist in distributions])
@@ -48,8 +48,8 @@ class ActivityNet(nn.Module):
                  actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         
         action_logits = self.actor(env_state, action_mask)
-        # state_values = self.critic(env_state, action_mask)
-        state_values = self.critic(env_state)
+        state_values = self.critic(env_state, action_mask)
+        # state_values = self.critic(env_state)
 
         distributions = [Categorical(logits = logits) for logits in action_logits]
         logprobs = torch.stack([dist.log_prob(action) for (dist, action) in zip(distributions, actions.T)]).T

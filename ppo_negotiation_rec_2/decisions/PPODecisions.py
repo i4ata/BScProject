@@ -46,8 +46,9 @@ class PPODecisions:
     def select_action(self, env_state: torch.Tensor) -> List[np.ndarray]:
 
         decisions, logprobs, state_val = self.policy_old.act(env_state)
-        hs_actor = zip(*self.policy_old.actor.hidden_state)
-        hs_critic = zip(*self.policy_old.critic.hidden_state)
+        
+        hs_actor = list(zip(*self.policy_old.actor.hidden_state))
+        hs_critic = list(zip(*self.policy_old.critic.hidden_state))
         batch_size_iter = range(len(env_state))
 
         if self.buffer.env_states is None:
@@ -102,7 +103,7 @@ class PPODecisions:
 
         old_hidden_states_actor   = self.to_tuple(self.buffer.hidden_states_actor)
         old_hidden_states_critic  = self.to_tuple(self.buffer.hidden_states_critic)
-
+        
         # calculate advantages
         advantages = (returns.detach() - old_state_values.squeeze()).unsqueeze(-1)
 
@@ -112,8 +113,8 @@ class PPODecisions:
             log_probs, entropies, state_values = self.policy.evaluate(
                 env_state=old_states,
                 decisions=old_decisions,
-                hidden_state_actor=old_hidden_states_actor,
-                hidden_state_critic=old_hidden_states_critic
+                hidden_states_actor=old_hidden_states_actor,
+                hidden_states_critic=old_hidden_states_critic
             )
             
             state_values = torch.squeeze(state_values)
@@ -143,5 +144,6 @@ class PPODecisions:
         self.buffer.clear()
 
     def to_tuple(self, xs: List[List[Tuple[torch.Tensor, torch.Tensor]]]) -> Tuple[torch.Tensor, torch.Tensor]:
-        return (torch.cat(list(map(torch.stack, [x[0] for x in xs]))).detach(), \
-                torch.cat(list(map(torch.stack, [x[1] for x in xs]))).detach())
+        hidden_states = [item for sublist in xs for item in sublist]
+        return torch.stack([hs[0] for hs in hidden_states]).detach(), \
+               torch.stack([hs[1] for hs in hidden_states]).detach()

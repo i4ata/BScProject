@@ -4,19 +4,19 @@ from typing import Tuple, Optional
 
 class Actor(nn.Module):
 
-    def __init__(self, state_space):
+    def __init__(self, state_space: int, params: dict):
         super().__init__()
 
         self.hidden_state: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
 
-        self.input_layer = nn.Linear(state_space, 64)
-        self.lstm = nn.LSTMCell(64, 64)
+        self.input_layer = nn.Linear(state_space, params['hidden_size_actor'])
+        self.lstm = nn.LSTMCell(params['hidden_size_actor'], params['hidden_size_actor'])
         
         self.hidden_layers = nn.ModuleList([
-            nn.Linear(64, 64)
-            for i in range(3)
+            nn.Linear(params['hidden_size_actor'], params['hidden_size_actor'])
+            for i in range(params['n_hidden_layers_actor'])
         ])
-        self.output_layer = nn.Linear(64, 1)
+        self.output_layer = nn.Linear(params['hidden_size_actor'], 1)
         self.sigmoid = nn.Sigmoid()
         self.activation = nn.Tanh()
 

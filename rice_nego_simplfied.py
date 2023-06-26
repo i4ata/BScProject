@@ -171,8 +171,7 @@ class Rice:
             'action_masks' : np.ones(shape, dtype = bool),
             'promises' : np.ones(shape, dtype = bool),
             'proposals' : np.ones(shape, dtype = bool),
-            'decisions' : np.zeros(shape[:2], dtype = bool),
-            'rewards' : np.zeros(shape[:2], dtype = self.float_dtype)
+            'decisions' : np.zeros(shape[:2], dtype = bool)
         }
 
     def reset(self):
@@ -403,9 +402,7 @@ class Rice:
                 self.global_negotiation_state['action_masks'][self.timestep, 1 - agent] &= \
                     self.global_negotiation_state['promises'][self.timestep, 1 - agent]
 
-        self.global_negotiation_state['rewards'][self.timestep] = [reached_agreement] * self.num_regions
-
-        return self.generate_observation()
+        return self.generate_observation(), reached_agreement
 
     def register_proposals(self, proposals: List[Dict[str, np.ndarray]]):
 

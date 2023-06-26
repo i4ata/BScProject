@@ -12,20 +12,12 @@ class Actor(nn.Module):
             for i in range(params['n_hidden_layers_actor'])
         ])
         self.activation = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
 
-        self.heads = nn.ModuleList([
-            nn.ModuleDict({
-                'proposal' : nn.Sequential(
-                    nn.Linear(params['hidden_size_actor'], action_space),
-                    nn.Sigmoid()
-                ),
-                'promise' : nn.Sequential(
-                    nn.Linear(params['hidden_size_actor'], action_space),
-                    nn.Sigmoid()
-                )
-            })
-            for agent in range(num_agents - 1)
-        ])
+        self.output_layer = nn.ModuleDict({
+            'proposal' : nn.Linear(params['hidden_size_actor'], action_space),
+            'promise' : nn.Linear(params['hidden_size_actor'], action_space)
+        })
 
     def forward(self, state : torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
@@ -33,12 +25,7 @@ class Actor(nn.Module):
         for layer in self.hidden_layers:
             x = self.activation(layer(x))
 
-        proposal_probs, promise_probs = zip(*
-            [(head['proposal'](x), head['promise'](x)) 
-            for head in self.heads]
-        )
-
-        proposal_probs = torch.cat(proposal_probs, dim = 1)
-        promise_probs  = torch.cat(promise_probs,  dim = 1)
+        proposal_probs = self.sigmoid(self.output_layer['proposal'](x))
+        promise_probs = self.sigmoid(self.output_layer['promise'](x))
 
         return proposal_probs, promise_probs
