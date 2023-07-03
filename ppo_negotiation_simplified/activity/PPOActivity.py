@@ -24,16 +24,12 @@ class RolloutBuffer:
 
 class PPOActivity():
     
-    def __init__(self, state_space: int, action_space: MultiDiscrete, params: dict = None, device: str = 'cpu'):
+    def __init__(self, state_space: int, action_space: MultiDiscrete, device: str = 'cpu'):
         
-        if params is not None:
-            self.params = params
-        else:
-            with open('activity/params.yml') as f:
-                self.params = yaml.load(f, Loader=yaml.FullLoader)['ppo']
+        with open('activity/params.yml') as f:
+            self.params = yaml.load(f, Loader=yaml.FullLoader)
         self.device = device
         self.buffer = RolloutBuffer()
-
         self.policy = ActivityNet(state_space, action_space, self.params['policy']).to(device)
         
         self.optimizer = torch.optim.Adam([

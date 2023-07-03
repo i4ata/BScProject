@@ -1,24 +1,17 @@
+K_epochs: 43
+gamma: 0.99
+lr_actor: 0.001
+lr_critic: 0.001
+eps_clip: 0.27041210981332886
+entropy_coef: 0.014065701617384864
+mse_coef: 0.6559101515645455
 
-training:
-  n_envs: 6
-  epochs: 76
-  batch_size: 64
-
-ppo:
-  K_epochs: 43
-  gamma: 0.99
-  lr_actor: 0.001
-  lr_critic: 0.001
-  eps_clip: 0.27041210981332886
-  entropy_coef: 0.014065701617384864
-  mse_coef: 0.6559101515645455
+policy:
   
-  policy:
-    
-    actor:
-      n_hidden_layers_actor: 0 #3
-      hidden_size_actor: 16 #64
-    
-    critic:
-      n_hidden_layers_critic: 0 #3
-      hidden_size_critic: 16 #64
+  actor:
+    n_hidden_layers_actor: 3
+    hidden_size_actor: 64
+  
+  critic:
+    n_hidden_layers_critic: 3
+    hidden_size_critic: 64

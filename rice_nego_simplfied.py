@@ -382,9 +382,8 @@ class Rice:
 
         return self.climate_and_economy_simulation_step(actions)
 
-    def register_decisions(self, decisions: List[bool]):
+    def register_decisions(self, decisions: np.ndarray):
 
-        reached_agreement = -1
         # Register decisions into environment
         for agent in range(self.num_regions):
 
@@ -392,7 +391,6 @@ class Rice:
 
             if decisions[agent]:
 
-                reached_agreement = 1
                 # Update masks
                 # Accept proposal
                 self.global_negotiation_state['action_masks'][self.timestep, agent] &= \
@@ -402,18 +400,16 @@ class Rice:
                 self.global_negotiation_state['action_masks'][self.timestep, 1 - agent] &= \
                     self.global_negotiation_state['promises'][self.timestep, 1 - agent]
 
-        return self.generate_observation(), reached_agreement
+        return self.generate_observation()
 
-    def register_proposals(self, proposals: List[Dict[str, np.ndarray]]):
+    def register_proposals(self, proposals: np.ndarray):
+        proposals = proposals.reshape(2, 2, -1, self.num_discrete_action_levels)
 
         for agent in range(self.num_regions):
 
-            self.global_negotiation_state['proposals'][self.timestep, agent] = \
-                proposals[agent]['proposals'].reshape(-1, self.num_discrete_action_levels).astype(bool)
-            
-            self.global_negotiation_state['promises'][self.timestep, agent] = \
-                proposals[agent]['promises'].reshape(-1, self.num_discrete_action_levels).astype(bool)
-            
+            self.global_negotiation_state['proposals'][self.timestep, agent] = proposals[agent, 0]
+            self.global_negotiation_state['promises'][self.timestep, agent] = proposals[agent, 1]
+
         return self.generate_observation()
                 
     def generate_observation(self):
@@ -999,7 +995,7 @@ class Rice:
                 # Save the reward
                 rewards[trial * self.episode_length + step] = list(reward.values())
 
-        return rewards.mean(0)  
+        return rewards  
 
     def random_run(self) -> None:
         self.reset()

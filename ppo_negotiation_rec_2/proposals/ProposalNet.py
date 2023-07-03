@@ -17,8 +17,8 @@ class ProposalNet(nn.Module):
 
         super(ProposalNet, self).__init__()
 
-        self.actor = Actor(state_space, action_space.nvec.sum(), params['actor'])
-        self.critic = Critic(state_space, params['critic'])
+        self.actor = Actor(state_space, action_space.nvec.sum(), params=params['actor'])
+        self.critic = Critic(state_space, params=params['critic'])
 
     def act(self, env_state : torch.Tensor) -> Tuple[Dict[str, Dict[str, torch.Tensor]], torch.Tensor]:
         
