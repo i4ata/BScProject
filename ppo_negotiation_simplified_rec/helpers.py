@@ -85,11 +85,14 @@ def train(agents: List[Agent], envs: List[Rice], epochs: int = 50, batch_size: i
                     for env_id in range(len(envs)):
                         
                         if with_comm:
+                            
+                            mask: np.ndarray = envs[env_id].global_negotiation_state['action_masks'][t, i]
+                            invalid_mask: bool = (~mask).all(0).any()
 
-                            agent.proposal_net.buffer.rewards[env_id].append(mean_rewards[env_id])
+                            agent.proposal_net.buffer.rewards[env_id].append(mean_rewards[env_id] - invalid_mask * 10)
                             agent.proposal_net.buffer.is_terminals[env_id].append(is_terminal)
 
-                            agent.decision_net.buffer.rewards[env_id].append(mean_rewards[env_id])
+                            agent.decision_net.buffer.rewards[env_id].append(mean_rewards[env_id] - invalid_mask * 10)
                             agent.decision_net.buffer.is_terminals[env_id].append(is_terminal)
 
                         agent.activity_net.buffer.rewards[env_id].append(rewards[env_id, i])
