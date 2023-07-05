@@ -166,12 +166,12 @@ class Rice:
         self.default_agent_action_mask = np.ones(self.len_actions, dtype=bool).reshape(-1, self.num_discrete_action_levels)
 
     def init_global_negotiation_state(self):
-        shape = (self.episode_length + 1, self.num_regions, *self.default_agent_action_mask.shape)
+        n, t, mask = self.num_regions, self.episode_length + 1, self.default_agent_action_mask.shape
         self.global_negotiation_state = {
-            'action_masks' : np.ones(shape, dtype = bool),
-            'promises' : np.ones(shape, dtype = bool),
-            'proposals' : np.ones(shape, dtype = bool),
-            'decisions' : np.zeros(shape[:2], dtype = bool)
+            'action_masks' : np.ones((t, n, *mask), dtype = bool),
+            'promises' : np.ones((t, n, n-1, *mask), dtype = bool),
+            'proposals' : np.ones((t, n, n-1, *mask), dtype = bool),
+            'decisions' : np.zeros((t, n, n-1), dtype = bool)
         }
 
     def reset(self):
@@ -387,29 +387,32 @@ class Rice:
         # Register decisions into environment
         for agent in range(self.num_regions):
 
-            self.global_negotiation_state['decisions'][self.timestep, agent] = decisions[agent]
+            for other in range(self.num_regions - 1):
 
-            if decisions[agent]:
+                self.global_negotiation_state['decisions'][self.timestep, agent, other] = decisions[agent, other]
+                other_idx = other + (agent >= other)
+                agent_idx = agent - (agent >= other_idx)              
 
-                # Update masks
-                # Accept proposal
-                self.global_negotiation_state['action_masks'][self.timestep, agent] &= \
-                    self.global_negotiation_state['proposals'][self.timestep, 1 - agent]
-                
-                # Keep the promise
-                self.global_negotiation_state['action_masks'][self.timestep, 1 - agent] &= \
-                    self.global_negotiation_state['promises'][self.timestep, 1 - agent]
+                if decisions[agent, other]:
+
+                    # Accept proposal
+                    self.global_negotiation_state['action_masks'][self.timestep, agent] &= \
+                        self.global_negotiation_state['proposals'][self.timestep, other_idx, agent_idx]
+                    
+                    # Keep the promise
+                    self.global_negotiation_state['action_masks'][self.timestep, other_idx] &= \
+                        self.global_negotiation_state['promises'][self.timestep, other_idx, agent_idx]
 
         return self.generate_observation()
 
     def register_proposals(self, proposals: np.ndarray):
-        proposals = proposals.reshape(2, 2, -1, self.num_discrete_action_levels)
-
+        
+        proposals = proposals.reshape(self.num_regions, self.num_regions - 1, 2, -1, self.num_discrete_action_levels)
+        
         for agent in range(self.num_regions):
-
-            self.global_negotiation_state['proposals'][self.timestep, agent] = proposals[agent, 0]
-            self.global_negotiation_state['promises'][self.timestep, agent] = proposals[agent, 1]
-
+            for other in range(self.num_regions - 1):
+                self.global_negotiation_state['proposals'][self.timestep, agent, other] = proposals[agent, other, 0]
+                self.global_negotiation_state['promises'][self.timestep, agent, other] = proposals[agent, other, 1]
         return self.generate_observation()
                 
     def generate_observation(self):
@@ -456,8 +459,14 @@ class Rice:
             obs_dict[region_id] = {
                 _FEATURES: features_dict[region_id],
                 _ACTION_MASK: self.global_negotiation_state['action_masks'][self.timestep, region_id],
-                _PROMISES: self.global_negotiation_state['promises'][self.timestep, 1 - region_id],
-                _PROPOSALS: self.global_negotiation_state['proposals'][self.timestep, 1 - region_id],
+                _PROMISES: np.stack([
+                    self.global_negotiation_state['promises'][self.timestep, other, region_id - (region_id >= other)]
+                    for other in range(self.num_regions) if other != region_id
+                ]),
+                _PROPOSALS: np.stack([
+                    self.global_negotiation_state['proposals'][self.timestep, other, region_id - (region_id >= other)]
+                    for other in range(self.num_regions) if other != region_id
+                ]),
                 'own_promises': self.global_negotiation_state['promises'][self.timestep, region_id],
                 'own_proposals': self.global_negotiation_state['proposals'][self.timestep, region_id]
             }

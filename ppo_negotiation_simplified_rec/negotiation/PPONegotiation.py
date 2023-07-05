@@ -5,7 +5,7 @@ import yaml
 
 from negotiation.NegotiationNet import NegotiationNet
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 ################################## PPO Policy ##################################
 
@@ -18,6 +18,9 @@ class RolloutBuffer:
         self.rewards: Optional[List[List[torch.Tensor]]] = None
         self.state_values: Optional[List[List[torch.Tensor]]] = None
         self.is_terminals: Optional[List[List[torch.Tensor]]] = None
+
+        self.hidden_states_actor: Optional[List[List[Tuple[torch.Tensor, torch.Tensor]]]] = None
+        self.hidden_states_critic: Optional[List[List[Tuple[torch.Tensor, torch.Tensor]]]] = None
 
     def clear(self):
         self.__init__()
@@ -49,6 +52,8 @@ class PPONegotiation():
         actions, logprobs, state_val = self.policy_old.act(env_state)
 
         batch_size_iter = range(len(env_state))
+        hs_actor = list(zip(*self.policy_old.actor.hidden_state))
+        hs_critic = list(zip(*self.policy_old.critic.hidden_state))
         if self.buffer.env_states is None:
             self.buffer.env_states = [[env_state[i]] for i in batch_size_iter]
             self.buffer.actions = [[actions[i]] for i in batch_size_iter]
@@ -56,12 +61,18 @@ class PPONegotiation():
             self.buffer.state_values = [[state_val[i]] for i in batch_size_iter]
             self.buffer.rewards = [[] for i in batch_size_iter]
             self.buffer.is_terminals = [[] for i in batch_size_iter]
+
+            self.buffer.hidden_states_actor = [[hs_actor[i]] for i in batch_size_iter]
+            self.buffer.hidden_states_critic = [[hs_critic[i]] for i in batch_size_iter]
         else:
             for i in batch_size_iter:
                 self.buffer.env_states[i].append(env_state[i])
                 self.buffer.actions[i].append(actions[i])
                 self.buffer.logprobs[i].append(logprobs[i])
                 self.buffer.state_values[i].append(state_val[i])
+
+                self.buffer.hidden_states_actor[i].append(hs_actor[i])
+                self.buffer.hidden_states_critic[i].append(hs_critic[i])
 
         return [action.cpu().detach().numpy() for action in actions]
     
@@ -93,13 +104,22 @@ class PPONegotiation():
         old_logprobs = torch.cat(list(map(torch.stack, self.buffer.logprobs))).detach()
         old_state_values = torch.cat(list(map(torch.stack, self.buffer.state_values))).detach()
 
+        old_hidden_states_actor = self.to_tuple(self.buffer.hidden_states_actor)
+        old_hidden_states_critic = self.to_tuple(self.buffer.hidden_states_critic)
+
+
         # calculate advantages
         advantages = (returns.detach() - old_state_values.squeeze()).unsqueeze(-1)
 
         # Optimize policy for K epochs
         for _ in range(self.params['K_epochs']):
             # Evaluating old actions and values
-            logprobs, entropies, state_values = self.policy.evaluate(old_states, old_actions)
+            logprobs, entropies, state_values = self.policy.evaluate(
+                env_state=old_states,
+                actions=old_actions,
+                hidden_state_actor=old_hidden_states_actor,
+                old_hidden_states_critic=old_hidden_states_critic
+            )
             
             state_values = torch.squeeze(state_values)
 
@@ -126,3 +146,15 @@ class PPONegotiation():
 
         # clear buffer
         self.buffer.clear()
+
+    def save(self, checkpoint_path):
+        torch.save(self.policy_old.state_dict(), checkpoint_path)
+   
+    def load(self, checkpoint_path):
+        self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
+        self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
+    
+    def to_tuple(self, xs: List[List[Tuple[torch.Tensor, torch.Tensor]]]) -> Tuple[torch.Tensor, torch.Tensor]:
+        hidden_states = [item for sublist in xs for item in sublist]
+        return torch.stack([hs[0] for hs in hidden_states]).detach(), \
+               torch.stack([hs[1] for hs in hidden_states]).detach()

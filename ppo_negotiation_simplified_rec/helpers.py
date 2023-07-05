@@ -65,6 +65,10 @@ def train(agents: List[Agent], envs: List[Rice], epochs: int = 50, batch_size: i
         
         for batch in range(batch_size):
             states = [env.reset() for env in envs]
+
+            for agent in agents:
+                agent.reset_hs()
+
             for t in range(episode_length):
                     
                 if with_comm:
@@ -112,6 +116,10 @@ def eval_agents_stoch(agents: List[Agent], env: Rice, n_trials = 20, with_comm =
     env_rewards = np.zeros((n_trials, env.episode_length, len(agents))) 
     for trial in range(n_trials):
         state = env.reset()
+
+        for agent in agents:
+            agent.reset_hs()
+
         for step in range(env.episode_length):
 
             if with_comm:
@@ -129,6 +137,10 @@ def eval_agents_stoch(agents: List[Agent], env: Rice, n_trials = 20, with_comm =
 def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> np.ndarray:
     env_rewards = np.zeros((env.episode_length, len(agents)))
     state = env.reset()
+
+    for agent in agents:
+        agent.reset_hs()
+
     for step in range(env.episode_length):
         
         if with_comm:

@@ -93,3 +93,13 @@ class Agent():
         actions = self.activity_net.policy.eval_act(features, action_mask, deterministic)
 
         return actions
+    
+    def reset_hs(self) -> None: 
+
+        for policy in (self.activity_net, self.decision_net, self.proposal_net):
+            
+            policy.policy.actor.hidden_state = None
+            policy.policy.critic.hidden_state = None
+
+            policy.policy_old.actor.hidden_state = None
+            policy.policy_old.critic.hidden_state = None
