@@ -6,7 +6,29 @@ from gym.spaces import MultiDiscrete
 from activity.ActivityNet import ActivityNet
 
 from typing import List, Optional
-import yaml
+
+params = dict(
+    
+    K_epochs = 43,
+    gamma = 0.99,
+    lr_actor = 0.001,
+    lr_critic = 0.001,
+    eps_clip = 0.27041210981332886,
+    entropy_coef = 0.014065701617384864,
+    mse_coef = 0.6559101515645455,
+
+    policy = dict(
+        actor = dict(
+            n_hidden_layers_actor = 3,
+            hidden_size_actor = 64
+        ),
+
+        critic = dict(
+            n_hidden_layers_critic = 3,
+            hidden_size_critic = 64
+        )
+    )
+)
 
 class RolloutBuffer:
     def __init__(self):
@@ -26,8 +48,7 @@ class PPOActivity():
     
     def __init__(self, state_space: int, action_space: MultiDiscrete, device: str = 'cpu'):
         
-        with open('activity/params.yml') as f:
-            self.params = yaml.load(f, Loader=yaml.FullLoader)
+        self.params = params
         self.device = device
         self.buffer = RolloutBuffer()
         self.policy = ActivityNet(state_space, action_space, self.params['policy']).to(device)

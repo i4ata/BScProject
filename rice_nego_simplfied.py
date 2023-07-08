@@ -992,11 +992,11 @@ class Rice:
     def estimate_reward_distribution(self, n_trials: int = 1_000):
         rewards: np.ndarray = np.zeros((self.episode_length * n_trials, self.num_regions), dtype=self.float_dtype)
         for trial in tqdm(range(n_trials)):
-            state = self.reset()
+            self.reset()
             for step in range(self.episode_length):
                 
                 # Step in the environment with a random action
-                state, reward, _, _ = self.step({
+                _, reward, _, _ = self.step({
                     agent_id : np.random.randint(self.num_discrete_action_levels, size=len(self.action_space[agent_id]))
                     for agent_id in range(self.num_regions)
                 })

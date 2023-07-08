@@ -145,3 +145,23 @@ def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> np.ndar
         env_rewards[step] = list(reward.values())
 
     return env_rewards.mean(0)
+
+
+def run_experiments(n_agents):
+
+    torch.manual_seed(123)
+    torch.cuda.manual_seed(123)
+    
+    envs = create_envs(yamls_filename = f'yamls/{n_agents}_region_yamls')
+    assert envs[0].num_regions == n_agents
+
+    agents_no_comm = create_agents(envs[0])
+    agents_with_comm = create_agents(envs[0])
+
+    stoch_no_comm, det_no_comm = train(agents_no_comm, envs, epochs=200, batch_size=50, with_comm=False)
+    stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=200, batch_size=50, with_comm=True)
+    
+    np.save(f'runs/{n_agents}/stoch_no_comm.npy', stoch_no_comm)
+    np.save(f'runs/{n_agents}/det_no_comm.npy', det_no_comm)
+    np.save(f'runs/{n_agents}/stoch_with_comm.npy', stoch_with_comm)
+    np.save(f'runs/{n_agents}det_with_comm.npy', det_with_comm)

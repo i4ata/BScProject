@@ -12,7 +12,7 @@ from tqdm import tqdm
 from typing import List, Dict, Tuple, Optional
 
 def create_envs(n: int = 5, 
-                yamls_filename: str = '2_region_yamls', 
+                yamls_filename: str = 'yamls/2_region_yamls', 
                 num_discrete_action_levels: int = 10) -> List[Rice]:
     
     return [Rice(i, num_discrete_action_levels, yamls_filename) for i in range(n)]

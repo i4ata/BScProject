@@ -1,13 +1,34 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import yaml
 
 from negotiation.NegotiationNet import NegotiationNet
 
 from typing import List, Optional, Tuple
 
 ################################## PPO Policy ##################################
+
+params = dict(
+    lr_actor = 0.001,
+    lr_critic =  0.001,
+    K_epochs = 40,
+    eps_clip = 0.3,
+    entropy_coef = 0.1,
+    mse_coef = 0.65,
+    gamma = 0.9923157316342434,
+
+    policy = dict(
+        actor = dict(
+            n_hidden_layers_actor = 4,
+            hidden_size_actor = 256
+        ),
+    
+        critic = dict(
+            n_hidden_layers_critic = 4,
+            hidden_size_critic = 256
+        )
+    )
+)
 
 class RolloutBuffer:
     def __init__(self):
@@ -28,8 +49,7 @@ class RolloutBuffer:
 class PPONegotiation():
     def __init__(self, state_space: int, action_space: int, device: str):
         
-        with open('negotiation/params.yml') as f:
-            self.params = yaml.load(f, Loader=yaml.FullLoader)
+        self.params = params
         self.device = device
         self.buffer = RolloutBuffer()
 
