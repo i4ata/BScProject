@@ -55,7 +55,7 @@ def train(agents: List[Agent], envs: List[Rice], epochs: int = 50, batch_size: i
 
     episode_length = envs[0].episode_length
 
-    eval_stoch = np.zeros((epochs + 1, len(agents)))
+    eval_stoch = np.zeros((epochs + 1, 20, len(agents)))
     eval_stoch[0] = eval_agents_stoch(agents, envs[0], n_trials=20, with_comm=with_comm)
 
     eval_det = np.zeros((epochs + 1, len(agents)))
@@ -124,7 +124,7 @@ def eval_agents_stoch(agents: List[Agent], env: Rice, n_trials = 20, with_comm =
             actions = {i: agent.eval_act(state[i]) for i, agent in enumerate(agents)}
             state, reward, _, _ = env.step(actions)
             env_rewards[trial, step] = list(reward.values())
-    return env_rewards.mean((0, 1))
+    return env_rewards.mean(1)
 
 def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> np.ndarray:
     env_rewards = np.zeros((env.episode_length, len(agents)))
