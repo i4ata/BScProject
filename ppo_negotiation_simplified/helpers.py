@@ -162,4 +162,4 @@ def run_experiments(n_agents):
 
     stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=200, batch_size=50, with_comm=True)
     np.save(f'runs/{n_agents}/stoch_with_comm.npy', stoch_with_comm)
-    np.save(f'runs/{n_agents}det_with_comm.npy', det_with_comm)
+    np.save(f'runs/{n_agents}/det_with_comm.npy', det_with_comm)
