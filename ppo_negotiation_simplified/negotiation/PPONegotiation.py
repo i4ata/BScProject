@@ -10,8 +10,8 @@ from typing import List, Optional
 ################################## PPO Policy ##################################
 
 params = dict(
-    lr_actor = 0.001,
-    lr_critic =  0.001,
+    lr_actor = 0.0005,
+    lr_critic =  0.0005,
     K_epochs = 40,
     eps_clip = 0.3,
     entropy_coef = 0.1,
@@ -147,3 +147,10 @@ class PPONegotiation():
 
         # clear buffer
         self.buffer.clear()
+
+    def save(self, checkpoint_path):
+        torch.save(self.policy_old.state_dict(), checkpoint_path)
+   
+    def load(self, checkpoint_path):
+        self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
+        self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))

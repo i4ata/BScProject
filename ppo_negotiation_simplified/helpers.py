@@ -3,6 +3,7 @@ import torch
 import numpy as np
 
 import sys
+import os
 sys.path.append('..')
 
 from rice_nego_simplfied import Rice
@@ -12,7 +13,7 @@ from tqdm import tqdm
 from typing import List, Dict, Tuple, Optional
 
 def create_envs(n: int = 5, 
-                yamls_filename: str = '2_region_yamls', 
+                yamls_filename: str = 'yamls/2_region_yamls', 
                 num_discrete_action_levels: int = 10) -> List[Rice]:
     
     return [Rice(i, num_discrete_action_levels, yamls_filename) for i in range(n)]
@@ -51,15 +52,33 @@ def action_step(agents: List[Agent],
     
     return states, rewards
 
-def train(agents: List[Agent], envs: List[Rice], epochs: int = 50, batch_size: int = 40, with_comm = True) -> np.ndarray:
+def train(agents: List[Agent], 
+          envs: List[Rice], 
+          epochs: int = 50, 
+          batch_size: int = 40, 
+          with_comm: bool = True,
+          eval_epochs: int = 50) -> np.ndarray:
 
     episode_length = envs[0].episode_length
 
-    eval_stoch = np.zeros((epochs + 1, 20, len(agents)))
-    eval_stoch[0] = eval_agents_stoch(agents, envs[0], n_trials=20, with_comm=with_comm)
+    eval_stoch = np.zeros((epochs + 1, eval_epochs, len(agents)))
+    eval_stoch[0] = eval_agents_stoch(agents, envs[0], n_trials=eval_epochs, with_comm=with_comm)
 
-    eval_det = np.zeros((epochs + 1, len(agents)))
-    eval_det[0] = eval_agents_det(agents, envs[0], with_comm=with_comm)
+    eval_det = {'rewards': np.zeros((epochs + 1, len(agents)))}
+
+    if with_comm:
+        eval_det['promises'] = np.zeros((epochs + 1, len(agents), len(agents) - 1))
+        eval_det['proposals'] = np.zeros((epochs + 1, len(agents), len(agents) - 1))
+        eval_det['decisions'] = np.zeros((epochs + 1, len(agents), len(agents) - 1))
+
+    det = eval_agents_det(agents, envs[0], with_comm=with_comm)
+    eval_det['rewards'][0] = det['rewards']
+
+    if with_comm:
+        eval_det['promises'][0] = det['promises']
+        eval_det['proposals'][0] = det['proposals']
+        eval_det['decisions'][0] = det['decisions']
+        
 
     for epoch in tqdm(range(epochs)):
         
@@ -99,8 +118,15 @@ def train(agents: List[Agent], envs: List[Rice], epochs: int = 50, batch_size: i
                 agent.decision_net.update()
                 agent.proposal_net.update()
 
-        eval_stoch[epoch + 1] = eval_agents_stoch(agents, envs[0], n_trials=20, with_comm=with_comm)
-        eval_det[epoch + 1] = eval_agents_det(agents, envs[0], with_comm=with_comm)
+        eval_stoch[epoch + 1] = eval_agents_stoch(agents, envs[0], n_trials=50, with_comm=with_comm)
+        
+        det = eval_agents_det(agents, envs[0], with_comm=with_comm)
+        eval_det['rewards'][epoch + 1] = det['rewards']
+
+        if with_comm:
+            eval_det['promises'][epoch + 1] = det['promises']
+            eval_det['proposals'][epoch + 1] = det['proposals']
+            eval_det['decisions'][epoch + 1] = det['decisions']
         
     return eval_stoch, eval_det
 
@@ -126,8 +152,7 @@ def eval_agents_stoch(agents: List[Agent], env: Rice, n_trials = 20, with_comm =
             env_rewards[trial, step] = list(reward.values())
     return env_rewards.mean(1)
 
-def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> np.ndarray:
-    env_rewards = np.zeros((env.episode_length, len(agents)))
+def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> Dict[str, np.ndarray]:
     state = env.reset()
     for step in range(env.episode_length):
         
@@ -139,13 +164,18 @@ def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> np.ndar
             state = env.register_decisions(decisions)
 
         actions = {i: agent.eval_act(state[i], deterministic=True) for i, agent in enumerate(agents)}
-        state, reward, _, _ = env.step(actions)
-        env_rewards[step] = list(reward.values())
+        state, _, _, _ = env.step(actions)
 
-    return env_rewards.mean(0)
+    return_dict = {'rewards': env.global_state['reward_all_regions']['value'][1:].mean(0)}
 
+    if with_comm:
+        return_dict['proposals'] = env.global_negotiation_state['proposals'][:-1].mean((0, -2, -1))
+        return_dict['promises'] = env.global_negotiation_state['promises'][:-1].mean((0, -2, -1))
+        return_dict['decisions'] = env.global_negotiation_state['decisions'][:-1].mean(0)
 
-def run_experiments(n_agents):
+    return return_dict
+
+def run_experiments(n_agents, epochs = 200, batch_size = 50):
 
     torch.manual_seed(123)
     torch.cuda.manual_seed(123)
@@ -156,10 +186,19 @@ def run_experiments(n_agents):
     agents_no_comm = create_agents(envs[0])
     agents_with_comm = create_agents(envs[0])
 
-    stoch_no_comm, det_no_comm = train(agents_no_comm, envs, epochs=200, batch_size=50, with_comm=False)
-    np.save(f'runs/{n_agents}/stoch_no_comm.npy', stoch_no_comm)
-    np.save(f'runs/{n_agents}/det_no_comm.npy', det_no_comm)
+    path = f'runs/{n_agents}/no_comm'
+    os.makedirs(path, exist_ok=True)
+    for agent in agents_no_comm:
+        agent.save(path, False)
+    stoch_no_comm, det_no_comm = train(agents_no_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=False)
+    np.save(path + '/stoch.npy', stoch_no_comm)
+    np.save(path + '/det.npy', det_no_comm['rewards'])
 
-    stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=200, batch_size=50, with_comm=True)
-    np.save(f'runs/{n_agents}/stoch_with_comm.npy', stoch_with_comm)
-    np.save(f'runs/{n_agents}/det_with_comm.npy', det_with_comm)
+    path = f'runs/{n_agents}/with_comm'
+    os.makedirs(path, exist_ok=True)
+    for agent in agents_with_comm:
+        agent.save(path, True)
+    stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=True)
+    np.save(path + '/stoch.npy', stoch_with_comm)
+    for key in det_with_comm:
+        np.save(path + '/det_' + key + '.npy', det_with_comm[key])

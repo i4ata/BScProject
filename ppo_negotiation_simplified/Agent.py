@@ -5,6 +5,7 @@ from negotiation.PPONegotiation import PPONegotiation
 
 import torch
 import numpy as np
+import os
 
 from typing import Dict, List
 
@@ -28,7 +29,7 @@ class Agent():
                                            action_space=num_agents - 1, 
                                            device=device)
         
-
+        self.num_agents = num_agents
         self.device = device
         self.id = id
 
@@ -93,3 +94,23 @@ class Agent():
         actions = self.activity_net.policy.eval_act(features, action_mask, deterministic)
 
         return actions
+    
+    def save(self, checkpoint_path, negotiating = True):
+
+        directory = checkpoint_path + f'/{self.id}'
+        os.makedirs(directory, exist_ok=True)
+
+        self.activity_net.save(directory + '/a.pth')
+        if negotiating:
+            self.proposal_net.save(directory + '/p.pth')
+            self.decision_net.save(directory + '/d.pth')
+            
+    def load(self, checkpoint_path, negotiating = True):
+        
+        directory = checkpoint_path + f'/{self.id}'
+
+        self.activity_net.load(directory + '/a.pth')
+        if negotiating:
+            self.proposal_net.load(directory + '/p.pth')
+            self.decision_net.load(directory + '/d.pth')
+            
