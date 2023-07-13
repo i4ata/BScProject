@@ -188,17 +188,17 @@ def run_experiments(n_agents, epochs = 200, batch_size = 50):
 
     path = f'runs/{n_agents}/no_comm'
     os.makedirs(path, exist_ok=True)
+    stoch_no_comm, det_no_comm = train(agents_no_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=False)
     for agent in agents_no_comm:
         agent.save(path, False)
-    stoch_no_comm, det_no_comm = train(agents_no_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=False)
     np.save(path + '/stoch.npy', stoch_no_comm)
     np.save(path + '/det.npy', det_no_comm['rewards'])
 
     path = f'runs/{n_agents}/with_comm'
     os.makedirs(path, exist_ok=True)
+    stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=True)
     for agent in agents_with_comm:
         agent.save(path, True)
-    stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=True)
     np.save(path + '/stoch.npy', stoch_with_comm)
     for key in det_with_comm:
         np.save(path + '/det_' + key + '.npy', det_with_comm[key])
