@@ -239,7 +239,7 @@ def run_experiment_2(epochs = 200, batch_size = 50):
     train(agents1, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
     train(agents2, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
 
-    rs, decs, proms, props = eval_agents_stoch((agents1[0], agents2[0], envs[0]))
+    rs, decs, proms, props = eval_agents_stoch((agents1[0], agents2[0]), envs[0])
     
     path = 'runs2'
     os.makedirs(path, exist_ok=True)
