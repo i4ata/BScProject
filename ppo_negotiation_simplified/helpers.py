@@ -118,7 +118,7 @@ def train(agents: List[Agent],
                 agent.decision_net.update()
                 agent.proposal_net.update()
 
-        eval_stoch[epoch + 1] = eval_agents_stoch(agents, envs[0], n_trials=50, with_comm=with_comm)
+        eval_stoch[epoch + 1] = eval_agents_stoch(agents, envs[0], n_trials=eval_epochs, with_comm=with_comm)
         
         det = eval_agents_det(agents, envs[0], with_comm=with_comm)
         eval_det['rewards'][epoch + 1] = det['rewards']
@@ -202,3 +202,48 @@ def run_experiments(n_agents, epochs = 200, batch_size = 50):
     np.save(path + '/stoch.npy', stoch_with_comm)
     for key in det_with_comm:
         np.save(path + '/det_' + key + '.npy', det_with_comm[key])
+
+def eval_agents_stoch(agents, env, n_trials = 1000, with_comm = True):
+    
+    rewards, decisions, promises, proposals = np.zeros((4, n_trials))
+    for trial in tqdm(range(n_trials)):
+        state = env.reset()
+        for step in range(env.episode_length):
+
+            if with_comm:
+                p = np.concatenate([agent.eval_make_proposals(state[i]) for i, agent in enumerate(agents)])
+                state = env.register_proposals(p)
+
+                d = np.concatenate([agent.eval_make_decisions(state[i]) for i, agent in enumerate(agents)])
+                state = env.register_decisions(d)
+
+            actions = {i: agent.eval_act(state[i]) for i, agent in enumerate(agents)}
+            state, _, _, _ = env.step(actions)
+
+        rewards[trial] = env.global_state['reward_all_regions']['value'][1:].mean()
+        if with_comm:
+            decisions[trial] = env.global_negotiation_state['decisions'][:-1].mean()
+            proposals[trial] = env.global_negotiation_state['proposals'][:-1].mean()
+            promises[trial] = env.global_negotiation_state['promises'][:-1].mean()
+    
+    if with_comm:
+        return rewards, decisions, promises, proposals
+    return rewards
+
+def run_experiment_2(epochs = 200, batch_size = 50):
+    torch.manual_seed(123)
+    torch.cuda.manual_seed(123)
+    envs = create_envs(yamls_filename=f'yamls/2_region_yamls')
+    agents1 = create_agents(envs[0])
+    agents2 = create_agents(envs[0])
+    train(agents1, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
+    train(agents2, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
+
+    rs, decs, proms, props = eval_agents_stoch((agents1[0], agents2[0], envs[0]))
+    
+    path = 'runs2'
+    os.makedirs(path, exist_ok=True)
+    np.save(path + 'rs.npy', rs)
+    np.save(path + 'decs.npy', decs)
+    np.save(path + 'proms.npy', proms)
+    np.save(path + 'props.npy', props)
