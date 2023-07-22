@@ -203,7 +203,7 @@ def run_experiments(n_agents, epochs = 200, batch_size = 50):
     for key in det_with_comm:
         np.save(path + '/det_' + key + '.npy', det_with_comm[key])
 
-def eval_agents_stoch_final(agents, env, n_trials = 1000, with_comm = True):
+def eval_agents_stoch_final(agents: List[Agent], env: Rice, n_trials = 1000, with_comm = True):
     
     rewards, decisions, promises, proposals = np.zeros((4, n_trials))
     for trial in tqdm(range(n_trials)):
@@ -239,7 +239,7 @@ def run_experiment_2(epochs = 200, batch_size = 50):
     train(agents1, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
     train(agents2, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
 
-    rs, decs, proms, props = eval_agents_stoch((agents1[0], agents2[0]), envs[0])
+    rs, decs, proms, props = eval_agents_stoch_final((agents1[0], agents2[0]), envs[0])
     
     path = 'runs2'
     os.makedirs(path, exist_ok=True)
