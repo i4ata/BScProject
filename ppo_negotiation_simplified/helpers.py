@@ -203,7 +203,7 @@ def run_experiments(n_agents, epochs = 200, batch_size = 50):
     for key in det_with_comm:
         np.save(path + '/det_' + key + '.npy', det_with_comm[key])
 
-def eval_agents_stoch(agents, env, n_trials = 1000, with_comm = True):
+def eval_agents_stoch_final(agents, env, n_trials = 1000, with_comm = True):
     
     rewards, decisions, promises, proposals = np.zeros((4, n_trials))
     for trial in tqdm(range(n_trials)):
