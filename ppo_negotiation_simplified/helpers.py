@@ -10,7 +10,11 @@ from rice_nego_simplfied import Rice
 
 from tqdm import tqdm
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
+
+gamma = .99
+episode_length = 20
+discount_factors = gamma ** np.arange(episode_length)
 
 def create_envs(n: int = 5, 
                 yamls_filename: str = 'yamls/2_region_yamls', 
@@ -24,8 +28,20 @@ def create_agents(env: Rice) -> List[Agent]:
     return [Agent(len(state[i]['features']), env.action_space[i], env.num_regions, i, device) 
             for i in range(env.num_regions)]
 
-def get_mean_reward(env: Rice, n_trials = 100) -> np.ndarray:
-    return env.estimate_reward_distribution(n_trials)
+def get_baseline_cum_returns(env: Rice, n_trials = 100) -> np.ndarray:
+    returns = np.zeros(n_trials)
+    for trial in tqdm(range(n_trials)):
+
+        env.reset()
+        for step in range(env.episode_length):
+            env.step({
+                i : np.random.randint(env.num_discrete_action_levels, size=len(env.action_space[i]))
+                for i in range(env.num_regions)
+            })
+
+        returns[trial] = np.mean(compute_returns(env.global_state['reward_all_regions']['value']))
+
+    return returns   
 
 def proposals_step(agents: List[Agent], 
                    envs: List[Rice], 
@@ -61,24 +77,8 @@ def train(agents: List[Agent],
 
     episode_length = envs[0].episode_length
 
-    eval_stoch = np.zeros((epochs + 1, eval_epochs, len(agents)))
-    eval_stoch[0] = eval_agents_stoch(agents, envs[0], n_trials=eval_epochs, with_comm=with_comm)
-
-    eval_det = {'rewards': np.zeros((epochs + 1, len(agents)))}
-
-    if with_comm:
-        eval_det['promises'] = np.zeros((epochs + 1, len(agents), len(agents) - 1))
-        eval_det['proposals'] = np.zeros((epochs + 1, len(agents), len(agents) - 1))
-        eval_det['decisions'] = np.zeros((epochs + 1, len(agents), len(agents) - 1))
-
-    det = eval_agents_det(agents, envs[0], with_comm=with_comm)
-    eval_det['rewards'][0] = det['rewards']
-
-    if with_comm:
-        eval_det['promises'][0] = det['promises']
-        eval_det['proposals'][0] = det['proposals']
-        eval_det['decisions'][0] = det['decisions']
-        
+    evaluation = np.zeros((epochs + 1, eval_epochs, len(agents)))
+    evaluation[0] = eval_agents(agents, envs[0], n_trials=eval_epochs, with_comm=with_comm)
 
     for epoch in tqdm(range(epochs)):
         
@@ -118,24 +118,17 @@ def train(agents: List[Agent],
                 agent.decision_net.update()
                 agent.proposal_net.update()
 
-        eval_stoch[epoch + 1] = eval_agents_stoch(agents, envs[0], n_trials=eval_epochs, with_comm=with_comm)
+        evaluation[epoch + 1] = eval_agents(agents, envs[0], n_trials=eval_epochs, with_comm=with_comm)
         
-        det = eval_agents_det(agents, envs[0], with_comm=with_comm)
-        eval_det['rewards'][epoch + 1] = det['rewards']
+    return evaluation
 
-        if with_comm:
-            eval_det['promises'][epoch + 1] = det['promises']
-            eval_det['proposals'][epoch + 1] = det['proposals']
-            eval_det['decisions'][epoch + 1] = det['decisions']
-        
-    return eval_stoch, eval_det
+def compute_returns(rewards: np.ndarray) -> np.ndarray:
+    cum_returns = np.cumsum(np.flipud(rewards[1:]), axis = 0)
+    disc_cum_returns = cum_returns * discount_factors[:, np.newaxis]
+    return np.sum(disc_cum_returns, 0)
 
-def random_runs(env: Rice, n_trials: int = 20, with_comm = False):
-
-    return eval_agents_stoch(create_agents(env), env, n_trials=n_trials, with_comm=with_comm)
-
-def eval_agents_stoch(agents: List[Agent], env: Rice, n_trials = 20, with_comm = True):
-    env_rewards = np.zeros((n_trials, env.episode_length, len(agents))) 
+def eval_agents(agents: List[Agent], env: Rice, n_trials = 50, with_comm = True) -> np.ndarray:
+    env_rewards = np.zeros((n_trials, len(agents))) 
     for trial in range(n_trials):
         state = env.reset()
         for step in range(env.episode_length):
@@ -148,32 +141,9 @@ def eval_agents_stoch(agents: List[Agent], env: Rice, n_trials = 20, with_comm =
                 state = env.register_decisions(decisions)
 
             actions = {i: agent.eval_act(state[i]) for i, agent in enumerate(agents)}
-            state, reward, _, _ = env.step(actions)
-            env_rewards[trial, step] = list(reward.values())
-    return env_rewards.mean(1)
-
-def eval_agents_det(agents: List[Agent], env: Rice, with_comm = True) -> Dict[str, np.ndarray]:
-    state = env.reset()
-    for step in range(env.episode_length):
-        
-        if with_comm:
-            proposals = np.concatenate([agent.eval_make_proposals(state[i], True) for i, agent in enumerate(agents)])
-            state = env.register_proposals(proposals)
-
-            decisions = np.concatenate([agent.eval_make_decisions(state[i], True) for i, agent in enumerate(agents)])
-            state = env.register_decisions(decisions)
-
-        actions = {i: agent.eval_act(state[i], deterministic=True) for i, agent in enumerate(agents)}
-        state, _, _, _ = env.step(actions)
-
-    return_dict = {'rewards': env.global_state['reward_all_regions']['value'][1:].mean(0)}
-
-    if with_comm:
-        return_dict['proposals'] = env.global_negotiation_state['proposals'][:-1].mean((0, -2, -1))
-        return_dict['promises'] = env.global_negotiation_state['promises'][:-1].mean((0, -2, -1))
-        return_dict['decisions'] = env.global_negotiation_state['decisions'][:-1].mean(0)
-
-    return return_dict
+            state, _, _, _ = env.step(actions)
+        env_rewards[trial] = compute_returns(env.global_state['reward_all_regions']['value'])
+    return env_rewards
 
 def run_experiments(n_agents, epochs = 200, batch_size = 50):
 
@@ -188,22 +158,19 @@ def run_experiments(n_agents, epochs = 200, batch_size = 50):
 
     path = f'runs/{n_agents}/no_comm'
     os.makedirs(path, exist_ok=True)
-    stoch_no_comm, det_no_comm = train(agents_no_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=False)
+    stoch_no_comm = train(agents_no_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=False)
     for agent in agents_no_comm:
         agent.save(path, False)
     np.save(path + '/stoch.npy', stoch_no_comm)
-    np.save(path + '/det.npy', det_no_comm['rewards'])
 
     path = f'runs/{n_agents}/with_comm'
     os.makedirs(path, exist_ok=True)
-    stoch_with_comm, det_with_comm = train(agents_with_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=True)
+    stoch_with_comm = train(agents_with_comm, envs, epochs=epochs, batch_size=batch_size, with_comm=True)
     for agent in agents_with_comm:
         agent.save(path, True)
     np.save(path + '/stoch.npy', stoch_with_comm)
-    for key in det_with_comm:
-        np.save(path + '/det_' + key + '.npy', det_with_comm[key])
 
-def eval_agents_stoch_final(agents: List[Agent], env: Rice, n_trials = 1000, with_comm = True):
+def eval_agents_final(agents: List[Agent], env: Rice, n_trials = 1000, with_comm = True):
     
     rewards, decisions, promises, proposals = np.zeros((4, n_trials))
     for trial in tqdm(range(n_trials)):
@@ -220,7 +187,7 @@ def eval_agents_stoch_final(agents: List[Agent], env: Rice, n_trials = 1000, wit
             actions = {i: agent.eval_act(state[i]) for i, agent in enumerate(agents)}
             state, _, _, _ = env.step(actions)
 
-        rewards[trial] = env.global_state['reward_all_regions']['value'][1:].mean()
+        rewards[trial] = compute_returns(env.global_state['reward_all_regions']['value'])
         if with_comm:
             decisions[trial] = env.global_negotiation_state['decisions'][:-1].mean()
             proposals[trial] = env.global_negotiation_state['proposals'][:-1].mean()
@@ -236,10 +203,11 @@ def run_experiment_2(epochs = 200, batch_size = 50):
     envs = create_envs(yamls_filename=f'yamls/2_region_yamls')
     agents1 = create_agents(envs[0])
     agents2 = create_agents(envs[0])
+    
     train(agents1, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
     train(agents2, envs, epochs = epochs, batch_size=batch_size, eval_epochs=1)
 
-    rs, decs, proms, props = eval_agents_stoch_final((agents1[0], agents2[0]), envs[0])
+    rs, decs, proms, props = eval_agents_final((agents1[0], agents2[0]), envs[0])
     
     path = 'runs2'
     os.makedirs(path, exist_ok=True)
