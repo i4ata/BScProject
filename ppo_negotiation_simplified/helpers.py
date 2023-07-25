@@ -187,7 +187,7 @@ def eval_agents_final(agents: List[Agent], env: Rice, n_trials = 1000, with_comm
             actions = {i: agent.eval_act(state[i]) for i, agent in enumerate(agents)}
             state, _, _, _ = env.step(actions)
 
-        rewards[trial] = compute_returns(env.global_state['reward_all_regions']['value'])
+        rewards[trial] = compute_returns(env.global_state['reward_all_regions']['value']).mean()
         if with_comm:
             decisions[trial] = env.global_negotiation_state['decisions'][:-1].mean()
             proposals[trial] = env.global_negotiation_state['proposals'][:-1].mean()
